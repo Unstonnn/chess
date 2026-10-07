@@ -82,17 +82,26 @@ class Game():
         Main running loop for the game
         """
         self.runs = True
+        moves = []
         while self.runs:
             self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
             inp = self.gui.waitClick()
             # print(inp)
-            moves = []
+            
+            if moves != []:
+                for move in moves:
+                    if move == inp:
+                        self.moves.append(self.board)
+                        self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
+                        self.board[piece[1]][piece[0]] = 0
+                        self.reverse()
 
+            moves = []
             if isinstance(inp, tuple):
                 if self.board[inp[1]][inp[0]] == 0:
                     pass
                 else:
-                    moves = self.board[inp[1]][inp[0]].clicked(inp, self)
+                    moves, piece = self.board[inp[1]][inp[0]].clicked(inp, self)
 
             if isinstance(inp, tuple):
                 self.clearDots(moves)
@@ -126,7 +135,7 @@ class Knight():
                         finalMoves.append(move)
                     elif piece.white != self.white:
                         finalMoves.append(move)
-        return finalMoves
+        return finalMoves, inp
 
 class Bishop():
     """
@@ -180,7 +189,7 @@ class Bishop():
                     else:
                         break
 
-        return moves
+        return moves, inp
 
 class Rook():
     """
@@ -234,7 +243,7 @@ class Rook():
                     else:
                         break
 
-        return moves
+        return moves, inp
 
 class King():
     """
@@ -265,7 +274,7 @@ class King():
                         finalMoves.append(move)
                     elif piece.white != self.white:
                         finalMoves.append(move)
-        return finalMoves
+        return finalMoves, inp
 
 class Queen():
     """
@@ -358,7 +367,7 @@ class Queen():
                         break
                     else:
                         break
-        return moves
+        return moves, inp
 
 class Pawn():
     """
@@ -371,29 +380,26 @@ class Pawn():
         self.moved = False
 
     def clicked(self, inp, Game): # haven't done en passant cause needs Game.moves != []
+        moves = []
         if Game.white == self.white: # also haven't added promotion
-            mult = 1
-            if self.white:
-                mult = -1 # moves -1 if white but 1 if white
-            moves = []
-            piece = Game.board[inp[1]+mult*1][inp[0]]
+            piece = Game.board[inp[1]-1][inp[0]]
             if piece == 0:
-                moves.append((inp[0], inp[1]+mult*1))
-            piece = Game.board[inp[1]+mult*2][inp[0]]
+                moves.append((inp[0], inp[1]-1))
+            piece = Game.board[inp[1]-2][inp[0]]
             if not self.moved and piece == 0:
-                moves.append((inp[0], inp[1]+mult*2))
+                moves.append((inp[0], inp[1]-2))
+                self.moved = True
             if inp[0]+1 <= 7:
-                piece = Game.board[inp[1]+mult*1][inp[0]+1]
+                piece = Game.board[inp[1]-1][inp[0]+1]
                 if piece != 0:
                     if piece.white != self.white:
-                        moves.append((inp[0]+1, inp[1]+mult*1))
+                        moves.append((inp[0]+1, inp[1]-1))
             if inp[0]-1 >= 0:
-                piece = Game.board[inp[1]+mult*1][inp[0]-1]
+                piece = Game.board[inp[1]-1][inp[0]-1]
                 if piece != 0:
                     if piece.white != self.white:
-                        moves.append((inp[0]-1, inp[1]+mult*1))
-        return moves
-            
+                        moves.append((inp[0]-1, inp[1]-1))
+        return moves, inp
 
 # -------------------------------- Main program ------------------------------- #
 
@@ -403,6 +409,6 @@ game.initiate()
 # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(True), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,King(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
 # game.customBoard([[Rook(False), Knight(False), Bishop(True), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Bishop(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
 # game.customBoard([[Rook(True), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Rook(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# Sgame.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
 game.run()
