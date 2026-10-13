@@ -81,11 +81,20 @@ class Game():
         self.board = Board
 
     def isInCheck(self):
-        for row in self.board:
-            for square in row:
-                if square != 0:
-                    if not square.white == self.white:
-                        pass # building this rn
+        attacks = []
+        for i, row in enumerate(self.board):
+            for j, piece in enumerate(row):
+                inp = (j,i)
+                if piece != 0:
+                    if not piece.white == self.white:
+                        moves, _ = piece.clicked(inp, self, True)
+                        attacks.extend(moves)
+                    elif isinstance(piece,King):
+                        king = inp
+        for attack in attacks:
+            if attack == king:
+                return True
+        return False
 
     def run(self):
         """
@@ -94,6 +103,7 @@ class Game():
         self.runs = True
         moves = []
         while self.runs:
+            toPass = False
             self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
             inp = self.gui.waitClick()
             # print(inp)
@@ -107,6 +117,8 @@ class Game():
                             self.board[move[1][1]][move[0][0]] = 0
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
+                            toPass = True
+                            print(self.isInCheck())
                             break
                     if move == inp:
                         self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
@@ -115,8 +127,12 @@ class Game():
                             self.board[inp[1]][inp[0]] = Queen(self.white)
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
+                        toPass = True
+                        print(self.isInCheck())
                         break
 
+            if toPass:
+                pass
             moves = []
             if isinstance(inp, tuple):
                 if self.board[inp[1]][inp[0]] == 0:
@@ -136,9 +152,9 @@ class Knight():
     def __init__(self, White: bool):
         self.white = White
 
-    def clicked(self, inp, Game):
+    def clicked(self, inp, Game, check: bool = False):
         finalMoves = []
-        if Game.white == self.white:
+        if Game.white == self.white or check:
             moves = [
                 (inp[0]-2,inp[1]-1),
                 (inp[0]-1,inp[1]-2),
@@ -167,9 +183,9 @@ class Bishop():
     def __init__(self, White: bool):
         self.white = White
 
-    def clicked(self, inp, Game):
+    def clicked(self, inp, Game, check: bool = False):
         moves = []
-        if Game.white == self.white:
+        if Game.white == self.white or check:
             for i in range(1,8):
                 if inp[0]+i <= 7 and inp[1]+i <= 7 and inp[0]+i >= 0 and inp[1]+i >= 0:
                     if Game.board[inp[1]+i][inp[0]+i] == 0:
@@ -221,9 +237,9 @@ class Rook():
     def __init__(self, White: bool):
         self.white = White
 
-    def clicked(self, inp, Game):
+    def clicked(self, inp, Game, check: bool = False):
         moves = []
-        if Game.white == self.white:
+        if Game.white == self.white or check:
             for i in range(1,8):
                 if inp[0]+i <= 7 and inp[0]+i >= 0:
                     if Game.board[inp[1]][inp[0]+i] == 0:
@@ -275,9 +291,9 @@ class King():
     def __init__(self, White: bool):
         self.white = White
 
-    def clicked(self, inp, Game):
+    def clicked(self, inp, Game, check: bool = False):
         finalMoves = []
-        if Game.white == self.white:
+        if Game.white == self.white or check:
             moves = [
                 (inp[0]-1,inp[1]-1),
                 (inp[0]-1,inp[1]),
@@ -306,9 +322,9 @@ class Queen():
     def __init__(self, White: bool):
         self.white = White
 
-    def clicked(self, inp, Game):
+    def clicked(self, inp, Game, check: bool = False):
         moves = []
-        if Game.white == self.white:
+        if Game.white == self.white or check:
             for i in range(1,8):
                 if inp[0]+i <= 7 and inp[1]+i <= 7 and inp[0]+i >= 0 and inp[1]+i >= 0:
                     if Game.board[inp[1]+i][inp[0]+i] == 0:
@@ -400,9 +416,22 @@ class Pawn():
         self.white = White
         self.moved = False
 
-    def clicked(self, inp, Game):
+    def clicked(self, inp, Game, check: bool = False):
         moves = []
-        if Game.white == self.white: # also haven't added manual promotion
+        if check:
+            if inp[0]+1 <= 7:
+                piece = Game.board[inp[1]+1][inp[0]+1]
+                if piece != 0:
+                    if piece.white != self.white:
+                        moves.append((inp[0]+1, inp[1]+1))
+            if inp[0]-1 >= 0:
+                piece = Game.board[inp[1]+1][inp[0]-1]
+                if piece != 0:
+                    if piece.white != self.white:
+                        moves.append((inp[0]-1, inp[1]+1))
+            return moves, inp
+                
+        if Game.white == self.white or check: # also haven't added manual promotion
             piece = Game.board[inp[1]-1][inp[0]]
             if piece == 0:
                 moves.append((inp[0], inp[1]-1))
@@ -428,8 +457,7 @@ class Pawn():
                 if inp[0]-1 <= 7:
                     piece = Game.board[inp[1]][inp[0]+1]
                     if isinstance(Game.moves[-2][inp[1]-2][inp[0]+1], Pawn) and Game.moves[-1][inp[1]-2][inp[0]+1] == 0 and isinstance(Game.moves[-1][inp[1]][inp[0]+1], Pawn):
-                        moves.append(((inp[0]+1,inp[1]-1),(inp[0]+1,inp[1])))
-                
+                        moves.append(((inp[0]+1,inp[1]-1),(inp[0]+1,inp[1])))   
         return moves, inp
 
 # -------------------------------- Main program ------------------------------- #
