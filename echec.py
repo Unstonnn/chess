@@ -103,7 +103,7 @@ class Game():
         self.runs = True
         moves = []
         while self.runs:
-            toPass = False
+            toSkip = False
             self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
             inp = self.gui.waitClick()
             # print(inp)
@@ -114,11 +114,11 @@ class Game():
                         if move[0] == inp:
                             self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                             self.board[piece[1]][piece[0]] = 0
-                            self.board[move[1][1]][move[0][0]] = 0
+                            self.board[move[1][1]][move[1][0]] = 0
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
-                            toPass = True
-                            print(self.isInCheck())
+                            toSkip = True
+                            # print(self.isInCheck())
                             break
                     if move == inp:
                         self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
@@ -127,21 +127,32 @@ class Game():
                             self.board[inp[1]][inp[0]] = Queen(self.white)
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
-                        toPass = True
-                        print(self.isInCheck())
+                        toSkip = True
+                        # print(self.isInCheck())
                         break
 
-            if toPass:
-                pass
             moves = []
-            if isinstance(inp, tuple):
-                if self.board[inp[1]][inp[0]] == 0:
-                    pass
-                else:
-                    moves, piece = self.board[inp[1]][inp[0]].clicked(inp, self)
+            self.clearDots()
+            if not toSkip:
+                if isinstance(inp, tuple):
+                    if self.board[inp[1]][inp[0]] == 0:
+                        pass
+                    else:
+                        moves, piece = self.board[inp[1]][inp[0]].clicked(inp, self)
+                        finalMoves = []
+                        for move in moves:
+                            actPiece = self.board[piece[1]][piece[0]]
+                            actMove = self.board[move[1]][move[0]]
+                            self.board[move[1]][move[0]] = self.board[piece[1]][piece[0]]
+                            self.board[piece[1]][piece[0]] = 0
+                            if not self.isInCheck():
+                                finalMoves.append(move)
+                            self.board[move[1]][move[0]] = actMove
+                            self.board[piece[1]][piece[0]] = actPiece
+                        moves = finalMoves
 
-            if isinstance(inp, tuple):
-                self.clearDots(moves)
+                if isinstance(inp, tuple):
+                    self.clearDots(moves)
 
 class Knight():
     """
@@ -414,7 +425,6 @@ class Pawn():
 
     def __init__(self, White: bool):
         self.white = White
-        self.moved = False
 
     def clicked(self, inp, Game, check: bool = False):
         moves = []
@@ -431,14 +441,13 @@ class Pawn():
                         moves.append((inp[0]-1, inp[1]+1))
             return moves, inp
                 
-        if Game.white == self.white or check: # also haven't added manual promotion
+        if Game.white == self.white: # also haven't added manual promotion
             piece = Game.board[inp[1]-1][inp[0]]
             if piece == 0:
                 moves.append((inp[0], inp[1]-1))
             piece = Game.board[inp[1]-2][inp[0]]
-            if not self.moved and piece == 0:
+            if inp[1] == 6 and piece == 0:
                 moves.append((inp[0], inp[1]-2))
-                self.moved = True
             if inp[0]+1 <= 7:
                 piece = Game.board[inp[1]-1][inp[0]+1]
                 if piece != 0:
