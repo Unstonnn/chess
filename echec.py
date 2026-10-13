@@ -111,10 +111,22 @@ class Game():
             if moves != []:
                 for move in moves:
                     if isinstance(move[0],tuple): # en passant logic
-                        if move[0] == inp:
+                        if move[0] == inp and isinstance(self.board[piece[1]][piece[0]], Pawn):
                             self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                             self.board[piece[1]][piece[0]] = 0
                             self.board[move[1][1]][move[1][0]] = 0
+                            self.reverse()
+                            self.moves.append([row.copy() for row in self.board])
+                            toSkip = True
+                            # print(self.isInCheck())
+                            break
+                        elif move[0] == inp and isinstance(self.board[piece[1]][piece[0]], King): # castling logic
+                            self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
+                            self.board[piece[1]][piece[0]] = 0
+                            self.board[move[1][1]][move[1][0]] = self.board[move[2][1]][move[2][0]]
+                            self.board[move[2][1]][move[2][0]] = 0
+                            self.board[inp[1]][inp[0]].moved = True
+                            self.board[move[1][1]][move[1][0]].moved = True
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             toSkip = True
@@ -125,6 +137,10 @@ class Game():
                         self.board[piece[1]][piece[0]] = 0
                         if inp[1] == 0 and isinstance(self.board[inp[1]][inp[0]], Pawn):
                             self.board[inp[1]][inp[0]] = Queen(self.white)
+                        elif isinstance(self.board[inp[1]][inp[0]], King):
+                            self.board[inp[1]][inp[0]].moved = True
+                        elif isinstance(self.board[inp[1]][inp[0]], Rook):
+                            self.board[inp[1]][inp[0]].moved = True
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
                         toSkip = True
@@ -142,6 +158,18 @@ class Game():
                         finalMoves = []
                         for move in moves:
                             actPiece = self.board[piece[1]][piece[0]]
+                            if isinstance(move[0],tuple): #castling | TODO: Make isInCheck() test for king in move[0][0]+1 and +2
+                                self.board[move[0][1]][move[0][0]] = actPiece
+                                self.board[piece[1]][piece[0]] = 0
+                                self.board[move[1][1]][move[1][0]] = self.board[move[2][1]][move[2][0]]
+                                self.board[move[2][1]][move[2][0]] = 0
+                                if not self.isInCheck():
+                                    finalMoves.append(move)
+                                self.board[piece[1]][piece[0]] = self.board[move[0][1]][move[0][0]]
+                                self.board[move[0][1]][move[0][0]] = 0
+                                self.board[move[2][1]][move[2][0]] = self.board[move[1][1]][move[1][0]]
+                                self.board[move[1][1]][move[1][0]] = 0
+                                continue
                             actMove = self.board[move[1]][move[0]]
                             self.board[move[1]][move[0]] = self.board[piece[1]][piece[0]]
                             self.board[piece[1]][piece[0]] = 0
@@ -150,8 +178,6 @@ class Game():
                             self.board[move[1]][move[0]] = actMove
                             self.board[piece[1]][piece[0]] = actPiece
                         moves = finalMoves
-
-                if isinstance(inp, tuple):
                     self.clearDots(moves)
 
 class Knight():
@@ -247,6 +273,7 @@ class Rook():
 
     def __init__(self, White: bool):
         self.white = White
+        self.moved = False
 
     def clicked(self, inp, Game, check: bool = False):
         moves = []
@@ -301,6 +328,7 @@ class King():
 
     def __init__(self, White: bool):
         self.white = White
+        self.moved = False
 
     def clicked(self, inp, Game, check: bool = False):
         finalMoves = []
@@ -313,7 +341,7 @@ class King():
                 (inp[0]+1,inp[1]+1),
                 (inp[0],inp[1]+1),
                 (inp[0]-1,inp[1]+1),
-                (inp[0],inp[1]+1)
+                (inp[0],inp[1]-1)
             ]
             for move in moves:
                 if move[0] >= 0 and move[0] <= 7 and move[1] >= 0 and move[1] <= 7:
@@ -322,6 +350,22 @@ class King():
                         finalMoves.append(move)
                     elif piece.white != self.white:
                         finalMoves.append(move)
+
+            if not self.moved: # Castling
+                if isinstance(Game.board[7][0], Rook) and not Game.board[7][0].moved:
+                    empty = True
+                    for i in range(1,inp[0]):
+                        if Game.board[7][i] != 0:
+                            empty = False
+                    if empty:
+                        finalMoves.append(((inp[0]-2,inp[1]),(inp[0]-1,inp[1]),(0,7)))
+                if isinstance(Game.board[7][7], Rook) and not Game.board[7][7].moved:
+                    empty = True
+                    for i in range(inp[0]+1,7):
+                        if Game.board[7][i] != 0:
+                            empty = False
+                    if empty:
+                        finalMoves.append(((inp[0]+2,inp[1]),(inp[0]+1,inp[1]),(7,7)))
         return finalMoves, inp
 
 class Queen():
