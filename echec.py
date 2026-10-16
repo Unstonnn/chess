@@ -105,6 +105,37 @@ class Game():
         self.runs = False
         self.gui.messCentre("Stalemate")
 
+    def filteredMoves(self, moves, piece):
+        finalMoves = []
+        for move in moves:
+            actPiece = self.board[piece[1]][piece[0]]
+            if isinstance(move[0],tuple): #castling
+                inCheck = False
+                if self.isInCheck():
+                    inCheck = True
+                self.board[move[1][1]][move[1][0]] = actPiece # moves king
+                self.board[piece[1]][piece[0]] = 0
+                if not inCheck and self.isInCheck():
+                    inCheck = True
+                self.board[move[0][1]][move[0][0]] = self.board[move[1][1]][move[1][0]] # moves king
+                self.board[move[1][1]][move[1][0]] = self.board[move[2][1]][move[2][0]] # moves rook
+                self.board[move[2][1]][move[2][0]] = 0
+                if not self.isInCheck() and not inCheck:
+                    finalMoves.append(move)
+                self.board[piece[1]][piece[0]] = self.board[move[0][1]][move[0][0]]
+                self.board[move[0][1]][move[0][0]] = 0
+                self.board[move[2][1]][move[2][0]] = self.board[move[1][1]][move[1][0]]
+                self.board[move[1][1]][move[1][0]] = 0
+                continue
+            actMove = self.board[move[1]][move[0]]
+            self.board[move[1]][move[0]] = self.board[piece[1]][piece[0]]
+            self.board[piece[1]][piece[0]] = 0
+            if not self.isInCheck():
+                finalMoves.append(move)
+            self.board[move[1]][move[0]] = actMove
+            self.board[piece[1]][piece[0]] = actPiece
+        return finalMoves
+
     def run(self):
         """
         Main running loop for the game
@@ -116,7 +147,7 @@ class Game():
             self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
             inp = self.gui.waitClick()
             # print(inp)
-            
+
             if moves != []:
                 for move in moves:
                     if isinstance(move[0],tuple): # en passant logic
@@ -156,6 +187,19 @@ class Game():
                         # print(self.isInCheck())
                         break
 
+            allMoves = [] # checks if can move
+            for i, row in enumerate(self.board):
+                for j, square in enumerate(row):
+                    if square != 0 and square.white == self.white:
+                        moves, piece = square.clicked(inp, self)
+                        moves = self.filteredMoves(moves, piece)
+                        allMoves.extend(moves)
+            if allMoves == []:
+                if self.isInCheck():
+                    self.checkmate()
+                else:
+                    self.stalemate()
+
             moves = []
             self.clearDots()
             if not toSkip:
@@ -164,44 +208,8 @@ class Game():
                         pass
                     else:
                         moves, piece = self.board[inp[1]][inp[0]].clicked(inp, self)
-                        finalMoves = []
-                        for move in moves:
-                            actPiece = self.board[piece[1]][piece[0]]
-                            if isinstance(move[0],tuple): #castling
-                                inCheck = False
-                                if self.isInCheck():
-                                    inCheck = True
-                                self.board[move[1][1]][move[1][0]] = actPiece # moves king
-                                self.board[piece[1]][piece[0]] = 0
-                                if not inCheck and self.isInCheck():
-                                    inCheck = True
-                                self.board[move[0][1]][move[0][0]] = self.board[move[1][1]][move[1][0]] # moves king
-                                self.board[move[1][1]][move[1][0]] = self.board[move[2][1]][move[2][0]] # moves rook
-                                self.board[move[2][1]][move[2][0]] = 0
-                                if not self.isInCheck() and not inCheck:
-                                    finalMoves.append(move)
-                                self.board[piece[1]][piece[0]] = self.board[move[0][1]][move[0][0]]
-                                self.board[move[0][1]][move[0][0]] = 0
-                                self.board[move[2][1]][move[2][0]] = self.board[move[1][1]][move[1][0]]
-                                self.board[move[1][1]][move[1][0]] = 0
-                                continue
-                            actMove = self.board[move[1]][move[0]]
-                            self.board[move[1]][move[0]] = self.board[piece[1]][piece[0]]
-                            self.board[piece[1]][piece[0]] = 0
-                            if not self.isInCheck():
-                                finalMoves.append(move)
-                            self.board[move[1]][move[0]] = actMove
-                            self.board[piece[1]][piece[0]] = actPiece
-                        moves = finalMoves
-                    self.clearDots(moves)
-
-                    # TODO: make this happen after a move, not piece selection
-                    # if moves == []:
-                    #     if self.isInCheck():
-                    #         self.checkmate()
-                    #     else:
-                    #         self.stalemate()
-                    #     continue
+                        moves = self.filteredMoves(moves, piece)
+                self.clearDots(moves)
 
 class Knight():
     """
@@ -538,13 +546,18 @@ class Pawn():
 
 # -------------------------------- Main program ------------------------------- #
 
-game = Game()
-game.initiate()
-# game.customBoard([[Rook(False), Knight(True), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Knight(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(True), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,King(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(True), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Bishop(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(True), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Rook(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-game.customBoard([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
-game.run()
+while True:
+    inp = input()
+
+    game = Game()
+    game.initiate()
+    # game.customBoard([[Rook(False), Knight(True), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Knight(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+    # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(True), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,King(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+    # game.customBoard([[Rook(False), Knight(False), Bishop(True), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Bishop(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+    # game.customBoard([[Rook(True), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Rook(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+    # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+    # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+    game.customBoard([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
+    game.run()
+
+# TODO: Remove all "if check:" in the 6 piece classes ; not needed
