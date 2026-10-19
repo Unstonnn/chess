@@ -96,20 +96,38 @@ class Game():
                 return True
         return False
 
-    def checkmate(self):
+    def win(self, reason): # Ways to win: Checkmate ; resignation ; time
         self.runs = False
         color = "Black" if self.white else "White"
-        self.gui.messCentre(f"{color} wins !")
+        if reason == 0:
+            reason = "By checkmate"
+        elif reason == 1:
+            reason = "By resignation"
+        elif reason == 2:
+            reason = "On time"
+        self.gui.refresh(self.formattedBoard(), reason, self.dotBoard)
+        self.gui.messCentre(f"{color} wins")
 
-    def stalemate(self):
+    def draw(self, reason): # Ways to draw: No moves ; insufficient material ; repetition ; 50 moves ; stalemate ; agreement
         self.runs = False
-        self.gui.messCentre("Stalemate")
+        if reason == 0:
+            reason = "By stalemate"
+        elif reason == 1:
+            reason = "By agreement"
+        elif reason == 2:
+            reason = "By repetition"
+        elif reason == 3:
+            reason = "By insufficient material"
+        elif reason == 4:
+            reason = "By the 50-move rule"
+        self.gui.refresh(self.formattedBoard(), reason, self.dotBoard)
+        self.gui.messCentre("Draw")
 
     def filteredMoves(self, moves, piece):
         finalMoves = []
         for move in moves:
             actPiece = self.board[piece[1]][piece[0]]
-            if isinstance(move[0],tuple): #castling
+            if len(move) == 3: #castling
                 inCheck = False
                 if self.isInCheck():
                     inCheck = True
@@ -127,6 +145,9 @@ class Game():
                 self.board[move[2][1]][move[2][0]] = self.board[move[1][1]][move[1][0]]
                 self.board[move[1][1]][move[1][0]] = 0
                 continue
+            if isinstance(move[0], tuple):
+                finalMoves.append(move)
+                continue
             actMove = self.board[move[1]][move[0]]
             self.board[move[1]][move[0]] = self.board[piece[1]][piece[0]]
             self.board[piece[1]][piece[0]] = 0
@@ -142,9 +163,47 @@ class Game():
         """
         self.runs = True
         moves = []
+        moveRule = 0 # 50-move rule counter
         while self.runs:
             toSkip = False
             self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
+
+            allMoves = [] # checks for game end conditions
+            selfPieces = []
+            selfIF = []
+            otherPieces = []
+            otherIF = []
+            for i, row in enumerate(self.board):
+                for j, square in enumerate(row):
+                    if square != 0:
+                        if square.white == self.white:
+                            pieceMoves, boardPiece = square.clicked((j,i), self)
+                            pieceMoves = self.filteredMoves(pieceMoves, boardPiece)
+                            allMoves.extend(pieceMoves)
+                            selfPieces.append(self.board[j][i])
+                            if isinstance(square, King) or isinstance(square, Knight) or isinstance(square, Bishop):
+                                selfIF.append(self.board[j][i])
+                        else:
+                            otherPieces.append(self.board[j][i])
+                            if isinstance(square, King) or isinstance(square, Knight) or isinstance(square, Bishop):
+                                otherIF.append(self.board[j][i])
+            if allMoves == []:
+                if self.isInCheck():
+                    self.win(0) # Checkmate
+                else:
+                    self.draw(0) # Stalemate
+            if len(selfIF) <= 2 and len(otherIF) <= 2 and selfPieces == selfIF and otherPieces == otherIF:
+                self.draw(3) # Insufficient material
+            repetition = 0
+            for state in self.moves:
+                if state == self.board:
+                    repetition += 1
+            if repetition == 3:
+                self.draw(2) # Repetition
+            if moveRule >= 50:
+                self.draw(4) # 50-move rule
+            print(moveRule)
+            
             inp = self.gui.waitClick()
             # print(inp)
 
@@ -155,6 +214,7 @@ class Game():
                             self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                             self.board[piece[1]][piece[0]] = 0
                             self.board[move[1][1]][move[1][0]] = 0
+                            moveRule = 0
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             toSkip = True
@@ -167,6 +227,7 @@ class Game():
                             self.board[move[2][1]][move[2][0]] = 0
                             self.board[inp[1]][inp[0]].moved = True
                             self.board[move[1][1]][move[1][0]].moved = True
+                            moveRule += 1
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             toSkip = True
@@ -181,24 +242,15 @@ class Game():
                             self.board[inp[1]][inp[0]].moved = True
                         elif isinstance(self.board[inp[1]][inp[0]], Rook):
                             self.board[inp[1]][inp[0]].moved = True
+                        if self.moves[-1][inp[1]][inp[0]] != 0 or isinstance(self.board[inp[1]][inp[0]], Pawn):
+                            moveRule = 0
+                        else:
+                            moveRule += 1
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
                         toSkip = True
                         # print(self.isInCheck())
                         break
-
-            allMoves = [] # checks if can move
-            for i, row in enumerate(self.board):
-                for j, square in enumerate(row):
-                    if square != 0 and square.white == self.white:
-                        moves, piece = square.clicked(inp, self)
-                        moves = self.filteredMoves(moves, piece)
-                        allMoves.extend(moves)
-            if allMoves == []:
-                if self.isInCheck():
-                    self.checkmate()
-                else:
-                    self.stalemate()
 
             moves = []
             self.clearDots()
@@ -557,7 +609,5 @@ while True:
     # game.customBoard([[Rook(True), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Rook(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
     # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
     # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-    game.customBoard([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
+    # game.customBoard([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
     game.run()
-
-# TODO: Remove all "if check:" in the 6 piece classes ; not needed
