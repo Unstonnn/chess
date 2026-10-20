@@ -1,0 +1,2 @@
+inquirer==3.4.1
+pygame==2.6.1

@@ -1,6 +1,12 @@
 from guiEchec import *
 
 # ---------------------------------- Classes ---------------------------------- #
+# TODO: Look at previous moves ; timer (and its win + draw conditions) (use datetime)
+# TODO: make manual promotion less buggy ? ; Add escape opens menu
+# TODO: To fix promotion and for everything else see if can stop not responding when pausing pygame
+# TODO: See if can focus terminal when manual promotion and finish game and vice versa for board
+# TODO: See how to not close program when closing pygame window
+# TODO: I think closing the window  causes an error which makes it open again in the except l89
 
 class Game():
     """
@@ -9,7 +15,97 @@ class Game():
     """
 
     def __init__(self):
-        pass # after will fill when doing menu
+        self.autoPromote = True
+        self.timer = False
+        self.baseTime = 15
+        self.increment = 10
+        mainMenu = True
+        GRAY = '\033[90m'
+        RED    = '\033[91m'
+        while True:
+            try:
+                import inquirer
+                if mainMenu:
+                    questions = [
+                    inquirer.List("choice", message=f"{RED}Chess",
+                                choices=["Start Game", "Options", "Quit"],
+                                default="Start Game")
+                                ]
+                    answers = inquirer.prompt(questions)
+                    if answers["choice"] == "Start Game":
+                        self.initiate()
+                        self.run()
+                    elif answers["choice"] == "Options":
+                        mainMenu = False
+                    elif answers["choice"] == "Quit":
+                        break
+                else:
+                    if not self.timer:
+                        options = [f"Auto Promotion — {self.autoPromote}",
+                                f"Timer — {self.timer}",
+                                f"{GRAY}Starting Time — {self.baseTime}",
+                                f"{GRAY}Increment — {self.increment}",
+                                "Back"]
+                    else:
+                        options = [f"Auto Promotion — {self.autoPromote}",
+                                f"Timer — {self.timer}",
+                                f"Starting Time — {self.baseTime}",
+                                f"Increment — {self.increment}",
+                                "Back"]
+                    questions = [
+                    inquirer.List("choice", message=f"{RED}Options",
+                                choices=options,
+                                carousel=True)
+                                ]
+                    answers = inquirer.prompt(questions)
+                    if answers["choice"] == "Back":
+                        mainMenu = True
+                    elif answers["choice"] == options[0]:
+                        self.autoPromote = not self.autoPromote
+                    elif answers["choice"] == options[1]:
+                        self.timer = not self.timer
+                    elif self.timer:
+                        if answers["choice"] == options[2]:
+                            inp = input("Starting Time (in minutes): ")
+                            try:
+                                inp = int(inp)
+                                if inp > 0 and inp <= 720:
+                                    self.baseTime = inp
+                                else:
+                                    print("Number out of range")
+                            except:
+                                print("Please enter an integer")
+                        elif answers["choice"] == options[3]:
+                            inp = input("Increment (in seconds): ")
+                            try:
+                                inp = int(inp)
+                                if inp >= 0 and inp <= 240:
+                                    self.increment = inp
+                                else:
+                                    print("Number out of range")
+                            except:
+                                print("Please enter an integer")
+
+            except:
+                self.initiate()
+                self.run()
+
+    def manualPromotion(self): # Buggy
+        import inquirer
+        questions = [
+        inquirer.List("choice", message=f"Manual Promotion",
+                    choices=["Queen", "Rook", "Bishop", "Knight"],
+                    carousel=True)
+                    ]
+        answers = inquirer.prompt(questions)
+        if answers["choice"] == "Queen":
+            return Queen(self.white)
+        elif answers["choice"] == "Rook":
+            return Rook(self.white)
+        elif answers["choice"] == "Bishop":
+            return Bishop(self.white)
+        elif answers["choice"] == "Knight":
+            return Knight(self.white)
 
     def reverse(self):
         self.white = not self.white
@@ -202,7 +298,6 @@ class Game():
                 self.draw(2) # Repetition
             if moveRule >= 50:
                 self.draw(4) # 50-move rule
-            print(moveRule)
             
             inp = self.gui.waitClick()
             # print(inp)
@@ -237,7 +332,10 @@ class Game():
                         self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                         self.board[piece[1]][piece[0]] = 0
                         if inp[1] == 0 and isinstance(self.board[inp[1]][inp[0]], Pawn):
-                            self.board[inp[1]][inp[0]] = Queen(self.white)
+                            if self.autoPromote:
+                                self.board[inp[1]][inp[0]] = Queen(self.white)
+                            else:
+                                self.board[inp[1]][inp[0]] = self.manualPromotion()
                         elif isinstance(self.board[inp[1]][inp[0]], King):
                             self.board[inp[1]][inp[0]].moved = True
                         elif isinstance(self.board[inp[1]][inp[0]], Rook):
@@ -568,7 +666,7 @@ class Pawn():
                         moves.append((inp[0]-1, inp[1]+1))
             return moves, inp
                 
-        if Game.white == self.white: # also haven't added manual promotion
+        if Game.white == self.white:
             piece = Game.board[inp[1]-1][inp[0]]
             if piece == 0:
                 moves.append((inp[0], inp[1]-1))
@@ -598,16 +696,12 @@ class Pawn():
 
 # -------------------------------- Main program ------------------------------- #
 
-while True:
-    inp = input()
+game = Game()
 
-    game = Game()
-    game.initiate()
-    # game.customBoard([[Rook(False), Knight(True), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Knight(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-    # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(True), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,King(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-    # game.customBoard([[Rook(False), Knight(False), Bishop(True), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Bishop(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-    # game.customBoard([[Rook(True), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Rook(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-    # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-    # game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-    # game.customBoard([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
-    game.run()
+# game.customBoard([[Rook(False), Knight(True), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Knight(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(True), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,King(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[Rook(False), Knight(False), Bishop(True), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Bishop(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[Rook(True), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Rook(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game.customBoard([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
