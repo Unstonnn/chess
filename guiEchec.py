@@ -173,7 +173,7 @@ class GUIechec (object):
     def waitClick(self):
         """
         Cette méthode attend l'action d'un joueur. Elle gère trois type d'actions :
-            - demande fermeture de la fenètre : fermeture propre de la fenètre pygame et fin du programme python.
+            - demande fermeture de la fenêtre : fermeture propre de pygame et retour de None.
             - click sur la fenetre : retourne  un tuple qui référence la case cliquée (x, y).
             - Quelques autres touches sont également gérées et retourne la lettre saisie.
         Une fois exécutée, on ne peut sortir de cette méthode que par l'une de ces trois actions.
@@ -185,9 +185,8 @@ class GUIechec (object):
 
             for event in pygame.event.get():    #Attente des événements
                 if event.type == QUIT:
-                    continuer = False
                     pygame.quit()
-                    exit()
+                    return None # avant c'était exit()
 
                 if event.type == MOUSEBUTTONDOWN:
                     if event.button == 1:   #Si clic gauche
@@ -240,4 +239,3 @@ if __name__ == "__main__":
 
     while True :
         print(GUI.waitClick())
-

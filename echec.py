@@ -2,39 +2,67 @@ from guiEchec import *
 
 # ---------------------------------- Classes ---------------------------------- #
 # TODO: Look at previous moves ; timer (and its win + draw conditions) (use datetime)
-# TODO: make manual promotion less buggy ? ; Add escape opens menu
-# TODO: To fix promotion and for everything else see if can stop not responding when pausing pygame
-# TODO: See if can focus terminal when manual promotion and finish game and vice versa for board
-# TODO: See how to not close program when closing pygame window
-# TODO: I think closing the window  causes an error which makes it open again in the except l89
 
-class Game():
+class Game:
     """
     Main chess game class.
     Dependent on class GUIechec from guiEchec.
     """
 
-    def __init__(self):
+    def __init__(self, skip = False):
         self.autoPromote = True
         self.timer = False
         self.baseTime = 15
         self.increment = 10
         mainMenu = True
         GRAY = '\033[90m'
-        RED    = '\033[91m'
+        RED  = '\033[91m'
+
+        try:
+            import inquirer
+            import ctypes
+        except:
+            skip = True
         while True:
-            try:
-                import inquirer
+            if skip:
+                self.initiate()
+                self.run()
+            else:
+                # startGame() built with the help of AI
+                kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+                user32 = ctypes.WinDLL("user32", use_last_error=True)
+                kernel32.GetConsoleWindow.restype = ctypes.wintypes.HWND
+                user32.ShowWindow.argtypes = (ctypes.wintypes.HWND, ctypes.c_int)
+                user32.SetForegroundWindow.argtypes = (ctypes.wintypes.HWND,)
+
+                def focusWindow(hwnd):
+                    if hwnd:
+                        user32.ShowWindow(hwnd, 5)
+                        user32.SetForegroundWindow(hwnd)
+
+                def startGame():
+                    self.initiate()
+                    console_hwnd = kernel32.GetConsoleWindow()
+                    board_hwnd = pygame.display.get_wm_info().get("window")
+                    try:
+                        if console_hwnd:
+                            user32.ShowWindow(console_hwnd, 0)
+                        focusWindow(board_hwnd)
+                        self.run()
+                    finally:
+                        pygame.quit()
+                        if console_hwnd:
+                            focusWindow(console_hwnd)
+
                 if mainMenu:
                     questions = [
-                    inquirer.List("choice", message=f"{RED}Chess",
+                    inquirer.List("choice", message=f"\033[2J\033[H{RED}Chess",
                                 choices=["Start Game", "Options", "Quit"],
                                 default="Start Game")
                                 ]
                     answers = inquirer.prompt(questions)
                     if answers["choice"] == "Start Game":
-                        self.initiate()
-                        self.run()
+                        startGame()
                     elif answers["choice"] == "Options":
                         mainMenu = False
                     elif answers["choice"] == "Quit":
@@ -53,7 +81,7 @@ class Game():
                                 f"Increment — {self.increment}",
                                 "Back"]
                     questions = [
-                    inquirer.List("choice", message=f"{RED}Options",
+                    inquirer.List("choice", message=f"\033[2J\033[H{RED}Options",
                                 choices=options,
                                 carousel=True)
                                 ]
@@ -66,7 +94,7 @@ class Game():
                         self.timer = not self.timer
                     elif self.timer:
                         if answers["choice"] == options[2]:
-                            inp = input("Starting Time (in minutes): ")
+                            inp = input("\033[2J\033[HStarting Time (in minutes): ")
                             try:
                                 inp = int(inp)
                                 if inp > 0 and inp <= 720:
@@ -76,7 +104,7 @@ class Game():
                             except:
                                 print("Please enter an integer")
                         elif answers["choice"] == options[3]:
-                            inp = input("Increment (in seconds): ")
+                            inp = input("\033[2J\033[HIncrement (in seconds): ")
                             try:
                                 inp = int(inp)
                                 if inp >= 0 and inp <= 240:
@@ -86,26 +114,14 @@ class Game():
                             except:
                                 print("Please enter an integer")
 
-            except:
-                self.initiate()
-                self.run()
+    def manualPromotion(self):
+        self.gui.refresh(self.formattedBoard(), "Promotion — Q | R | B | N")
+        choices = {"Q": Queen, "R": Rook, "B": Bishop, "N": Knight}
 
-    def manualPromotion(self): # Buggy
-        import inquirer
-        questions = [
-        inquirer.List("choice", message=f"Manual Promotion",
-                    choices=["Queen", "Rook", "Bishop", "Knight"],
-                    carousel=True)
-                    ]
-        answers = inquirer.prompt(questions)
-        if answers["choice"] == "Queen":
-            return Queen(self.white)
-        elif answers["choice"] == "Rook":
-            return Rook(self.white)
-        elif answers["choice"] == "Bishop":
-            return Bishop(self.white)
-        elif answers["choice"] == "Knight":
-            return Knight(self.white)
+        while True:
+            choice = self.gui.waitClick()
+            if isinstance(choice, str) and choice.upper() in choices:
+                return choices[choice.upper()](self.white)
 
     def reverse(self):
         self.white = not self.white
@@ -302,6 +318,13 @@ class Game():
             inp = self.gui.waitClick()
             # print(inp)
 
+            if inp is None: # To avoid an error when closing
+                self.runs = False
+                return
+
+            if inp == '_S':
+                exit()
+
             if moves != []:
                 for move in moves:
                     if isinstance(move[0],tuple): # en passant logic
@@ -361,7 +384,7 @@ class Game():
                         moves = self.filteredMoves(moves, piece)
                 self.clearDots(moves)
 
-class Knight():
+class Knight:
     """
     Class for knight movement.
     Dependent on class GUIechec from guiEchec.
@@ -392,7 +415,7 @@ class Knight():
                         finalMoves.append(move)
         return finalMoves, inp
 
-class Bishop():
+class Bishop:
     """
     Class for bishop movement.
     Dependent on class GUIechec from guiEchec.
@@ -446,7 +469,7 @@ class Bishop():
 
         return moves, inp
 
-class Rook():
+class Rook:
     """
     Class for rook movement.
     Dependent on class GUIechec from guiEchec.
@@ -501,7 +524,7 @@ class Rook():
 
         return moves, inp
 
-class King():
+class King:
     """
     Class for king movement.
     Dependent on class GUIechec from guiEchec.
@@ -549,7 +572,7 @@ class King():
                         finalMoves.append(((inp[0]+2,inp[1]),(inp[0]+1,inp[1]),(7,7)))
         return finalMoves, inp
 
-class Queen():
+class Queen:
     """
     Class for queen movement.
     Dependent on class GUIechec from guiEchec.
@@ -642,7 +665,7 @@ class Queen():
                         break
         return moves, inp
 
-class Pawn():
+class Pawn:
     """
     Class for pawn movement.
     Dependent on class GUIechec from guiEchec.
