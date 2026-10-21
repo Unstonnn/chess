@@ -3,7 +3,7 @@ from pygame.locals import *
 #pour le rendre dispo de n'importe où
 import os
 pathname = os.path.dirname(__file__)
-
+from time import monotonic # ajouté
 
 class GUIechec (object):
 
@@ -170,7 +170,7 @@ class GUIechec (object):
         #Rafraîchissement de l'écran
         pygame.display.update()
 
-    def waitClick(self):
+    def waitClick(self, timeCalled=None): # onTick ajouté (None ou une fonction)
         """
         Cette méthode attend l'action d'un joueur. Elle gère trois type d'actions :
             - demande fermeture de la fenêtre : fermeture propre de pygame et retour de None.
@@ -181,12 +181,17 @@ class GUIechec (object):
         continuer = True
         while continuer:
             #Limitation de vitesse de la boucle
-            pygame.time.Clock().tick(30)
+            pygame.time.Clock().tick(120) # Changé de 30 à 100 pour pouvoir refresh le timer
+
+            ### code ajouté ###
+            if timeCalled is not None and monotonic() - timeCalled >= 0.01:
+                return "_T"  # Timer a expiré (pour refresh l'écran)
+            ###################
 
             for event in pygame.event.get():    #Attente des événements
                 if event.type == QUIT:
                     pygame.quit()
-                    return None # avant c'était exit()
+                    return None # code changé: avant c'était exit()
 
                 if event.type == MOUSEBUTTONDOWN:
                     if event.button == 1:   #Si clic gauche

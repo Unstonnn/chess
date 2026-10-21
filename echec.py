@@ -1,7 +1,9 @@
 from guiEchec import *
+from time import monotonic
 
 # ---------------------------------- Classes ---------------------------------- #
-# TODO: Look at previous moves ; timer (and its win + draw conditions) (use datetime)
+# TODO: Look at previous moves
+# TODO: timer (and its win + draw conditions) (use datetime)
 
 class Game:
     """
@@ -9,7 +11,7 @@ class Game:
     Dependent on class GUIechec from guiEchec.
     """
 
-    def __init__(self, skip = False):
+    def __init__(self, skip = False, board = None):
         self.autoPromote = True
         self.timer = False
         self.baseTime = 15
@@ -26,6 +28,8 @@ class Game:
         while True:
             if skip:
                 self.initiate()
+                if board is not None:
+                    self.customBoard(board)
                 self.run()
             else:
                 # startGame() built with the help of AI
@@ -42,6 +46,8 @@ class Game:
 
                 def startGame():
                     self.initiate()
+                    if board is not None:
+                        self.customBoard(board)
                     console_hwnd = kernel32.GetConsoleWindow()
                     board_hwnd = pygame.display.get_wm_info().get("window")
                     try:
@@ -58,7 +64,8 @@ class Game:
                     questions = [
                     inquirer.List("choice", message=f"\033[2J\033[H{RED}Chess",
                                 choices=["Start Game", "Options", "Quit"],
-                                default="Start Game")
+                                default="Start Game",
+                                carousel=True)
                                 ]
                     answers = inquirer.prompt(questions)
                     if answers["choice"] == "Start Game":
@@ -124,6 +131,10 @@ class Game:
                 return choices[choice.upper()](self.white)
 
     def reverse(self):
+        if self.timer:
+            self.remainingTime[self.white] -= monotonic() - self.turnStarted
+            self.remainingTime[self.white] += self.increment
+            self.turnStarted = monotonic()
         self.white = not self.white
         self.gui.flipNum = self.white
         self.board = list(reversed(self.board))
@@ -149,6 +160,8 @@ class Game:
         self.dotBoard = [[0 for i in range(8)] for j in range(8)]
         self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
         self.white = True
+        if self.timer:
+            self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
 
     def formattedBoard(self):
         board = []
@@ -214,8 +227,6 @@ class Game:
         if reason == 0:
             reason = "By checkmate"
         elif reason == 1:
-            reason = "By resignation"
-        elif reason == 2:
             reason = "On time"
         self.gui.refresh(self.formattedBoard(), reason, self.dotBoard)
         self.gui.messCentre(f"{color} wins")
@@ -225,7 +236,7 @@ class Game:
         if reason == 0:
             reason = "By stalemate"
         elif reason == 1:
-            reason = "By agreement"
+            reason = "On time by insufficient material"
         elif reason == 2:
             reason = "By repetition"
         elif reason == 3:
@@ -269,16 +280,33 @@ class Game:
             self.board[piece[1]][piece[0]] = actPiece
         return finalMoves
 
+    def formatTime(self, elapsedTime):
+        timeLeft = self.remainingTime[self.white] - elapsedTime
+        centiSecondsLeft = max(0, int(timeLeft * 100))
+        minutes, remainder = divmod(centiSecondsLeft, 6000)
+        seconds, centiSeconds = divmod(remainder, 100)
+        if minutes:
+            return f"{minutes}:{seconds:02}.{centiSeconds:02}"
+        return f"{seconds}.{centiSeconds:02}"
+
     def run(self):
         """
         Main running loop for the game
         """
         self.runs = True
         moves = []
-        moveRule = 0 # 50-move rule counter
+        moveRule = 0 # 50-move rule counter        
+        if self.timer:
+            self.turnStarted = monotonic()
+
         while self.runs:
             toSkip = False
-            self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
+
+            if self.timer:
+                elapsedTime = monotonic() - self.turnStarted
+                self.gui.refresh(self.formattedBoard(), self.formatTime(elapsedTime), self.dotBoard)
+            else:
+                self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
 
             allMoves = [] # checks for game end conditions
             selfPieces = []
@@ -314,9 +342,25 @@ class Game:
                 self.draw(2) # Repetition
             if moveRule >= 50:
                 self.draw(4) # 50-move rule
-            
-            inp = self.gui.waitClick()
-            # print(inp)
+            if self.timer and self.remainingTime[self.white] - elapsedTime <= 0:
+                if len(otherIF) <= 2 and otherPieces == otherIF:
+                    self.draw(1) # On time by insufficient material
+                else:
+                    self.win(1) # On time
+
+            if not self.runs:
+                while True:
+                    inp = self.gui.waitClick()
+                    if inp is None or inp == '_S':
+                        return
+
+            if self.timer:
+                inp = self.gui.waitClick(monotonic())
+            else:
+                inp = self.gui.waitClick()
+
+            if inp == "_T":
+                continue
 
             if inp is None: # To avoid an error when closing
                 self.runs = False
@@ -711,7 +755,7 @@ class Pawn:
                     piece = Game.board[inp[1]][inp[0]-1]
                     if isinstance(Game.moves[-2][inp[1]-2][inp[0]-1], Pawn) and Game.moves[-1][inp[1]-2][inp[0]-1] == 0 and isinstance(Game.moves[-1][inp[1]][inp[0]-1], Pawn):
                         moves.append(((inp[0]-1,inp[1]-1),(inp[0]-1,inp[1])))
-                if inp[0]-1 <= 7:
+                if inp[0] < 7 and len(Game.moves) >= 2:
                     piece = Game.board[inp[1]][inp[0]+1]
                     if isinstance(Game.moves[-2][inp[1]-2][inp[0]+1], Pawn) and Game.moves[-1][inp[1]-2][inp[0]+1] == 0 and isinstance(Game.moves[-1][inp[1]][inp[0]+1], Pawn):
                         moves.append(((inp[0]+1,inp[1]-1),(inp[0]+1,inp[1])))   
@@ -719,12 +763,12 @@ class Pawn:
 
 # -------------------------------- Main program ------------------------------- #
 
+# If you want the menu and full options:
 game = Game()
 
-# game.customBoard([[Rook(False), Knight(True), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Knight(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(True), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,King(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(True), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Bishop(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(True), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Rook(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(True), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,Queen(True),0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[Pawn(True),0,0,Pawn(True),0,0,0,Pawn(True)]] + [[0,0,Pawn(True),0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
-# game.customBoard([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
+# If you want the board alone:
+game = Game(True)
+
+# Boards for tests:
+# game = Game([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
+# game = Game([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
