@@ -413,12 +413,8 @@ class Game:
             if inp == "_T":
                 continue
 
-            if inp is None: # To avoid an error when closing
-                self.runs = False
-                return
-
             if inp == '_S':
-                raise SystemExit
+                return
 
             if moves != []:
                 for move in moves:

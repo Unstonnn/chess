@@ -191,7 +191,7 @@ class GUIechec (object):
             for event in pygame.event.get():    #Attente des événements
                 if event.type == QUIT:
                     pygame.quit()
-                    return None # code changé: avant c'était exit()
+                    raise SystemExit # code changé: avant c'était exit()
 
                 if event.type == MOUSEBUTTONDOWN:
                     if event.button == 1:   #Si clic gauche
