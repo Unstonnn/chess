@@ -4,12 +4,15 @@ from time import monotonic
 # ---------------------------------- Classes ---------------------------------- #
 
 class Game:
-    """
-    Main chess game class.
-    Dependent on class GUIechec from guiEchec.
-    """
+    """Manage a chess game, its board state, rules, timer, and GUI."""
 
     def __init__(self, skip = False, board = None):
+        """Create a game and start the menu or the game loop.
+
+        Args:
+            skip: Start directly without displaying the interactive menu.
+            board: Optional initial board used in place of the standard setup.
+        """
         self.autoPromote = True
         self.timer = False
         self.baseTime = 15
@@ -38,11 +41,13 @@ class Game:
                 user32.SetForegroundWindow.argtypes = (ctypes.wintypes.HWND,)
 
                 def focusWindow(hwnd):
+                    """Bring a valid Windows window to the foreground."""
                     if hwnd:
                         user32.ShowWindow(hwnd, 5)
                         user32.SetForegroundWindow(hwnd)
 
                 def startGame():
+                    """Initialize and run a game, restoring the console afterward."""
                     self.initiate()
                     if board is not None:
                         self.customBoard(board)
@@ -120,6 +125,7 @@ class Game:
                                 print("Please enter an integer")
 
     def manualPromotion(self):
+        """Ask the player to choose a piece when a pawn is promoted."""
         self.gui.refresh(self.formattedBoard(), "Promotion — Q | R | B | N")
         choices = {"Q": Queen, "R": Rook, "B": Bishop, "N": Knight}
 
@@ -129,6 +135,7 @@ class Game:
                 return choices[choice.upper()](self.white)
 
     def reverse(self):
+        """Switch the active player and rotate the board for that player's view."""
         if self.timer:
             self.remainingTime[self.white] -= monotonic() - self.turnStarted
             self.remainingTime[self.white] += self.increment
@@ -139,21 +146,22 @@ class Game:
         self.board = [list(reversed(row)) for row in self.board]
 
     def clearDots(self,  moves: list = []):
+        """Clear highlighted squares, then mark the supplied legal moves."""
         self.dotBoard = [[0 for i in range(8)] for j in range(8)]
         for move in moves:
+            # Special moves store their destination inside the first tuple.
             if isinstance(move[0], tuple):
                 self.dotBoard[move[0][1]][move[0][0]] = 1
             else:
                 self.dotBoard[move[1]][move[0]] = 1
 
     def initiate(self, P1: str = "White", P2: str = "Black"):
-        """
-        Initiates the correct variables for a new game
-        """
+        """Set up a standard chess position and initialize game state."""
         self.p1 = P1
         self.p2 = P2
         self.gui = GUIechec()
         self.board = [[Rook(False), Knight(False), Bishop(False), Queen(False), King(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)] for j in range(4)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), Queen(True), King(True), Bishop(True), Knight(True), Rook(True)]]
+        # Keep a board snapshot so previous positions can be displayed and compared.
         self.moves = [[row.copy() for row in self.board]]
         self.dotBoard = [[0 for i in range(8)] for j in range(8)]
         self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
@@ -162,6 +170,7 @@ class Game:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
 
     def formattedBoard(self, actBoard = None):
+        """Convert piece objects into the string codes expected by the GUI."""
         board = []
         if actBoard is None:
             actBoard = self.board
@@ -203,9 +212,11 @@ class Game:
         return board
 
     def customBoard(self, Board):
+        """Replace the current position with the supplied board."""
         self.board = Board
 
     def isInCheck(self):
+        """Return whether the current player's king is attacked."""
         attacks = []
         for i, row in enumerate(self.board):
             for j, piece in enumerate(row):
@@ -222,6 +233,7 @@ class Game:
         return False
 
     def win(self, reason): # Ways to win: Checkmate ; resignation ; time
+        """End the game and display the winner and the reason."""
         self.runs = False
         color = "Black" if self.white else "White"
         if reason == 0:
@@ -231,7 +243,8 @@ class Game:
         self.gui.refresh(self.formattedBoard(), reason, self.dotBoard)
         self.gui.messCentre(f"{color} wins")
 
-    def draw(self, reason): # Ways to draw: No moves ; insufficient material ; repetition ; 50 moves ; stalemate ; agreement
+    def draw(self, reason): # Ways to draw: Insufficient material ; repetition ; 50 moves ; stalemate ; agreement
+        """End the game and display a draw with the supplied reason."""
         self.runs = False
         if reason == 0:
             reason = "By stalemate"
@@ -247,10 +260,12 @@ class Game:
         self.gui.messCentre("Draw")
 
     def filteredMoves(self, moves, piece):
+        """Remove moves that leave the moving player's king in check."""
         finalMoves = []
         for move in moves:
             actPiece = self.board[piece[1]][piece[0]]
             if len(move) == 3: #castling
+                # Test the king's starting, transit, and destination squares.
                 inCheck = False
                 if self.isInCheck():
                     inCheck = True
@@ -269,8 +284,10 @@ class Game:
                 self.board[move[1][1]][move[1][0]] = 0
                 continue
             if isinstance(move[0], tuple):
+                # En passant is represented specially and checked by the move handler.
                 finalMoves.append(move)
                 continue
+            # Temporarily apply each ordinary move to test for check, then restore it.
             actMove = self.board[move[1]][move[0]]
             self.board[move[1]][move[0]] = self.board[piece[1]][piece[0]]
             self.board[piece[1]][piece[0]] = 0
@@ -281,6 +298,7 @@ class Game:
         return finalMoves
 
     def formatTime(self):
+        """Return the active player's remaining time as a display string."""
         self.elapsedTime = monotonic() - self.turnStarted
         timeLeft = self.remainingTime[self.white] - self.elapsedTime
         centiSecondsLeft = max(0, int(timeLeft * 100))
@@ -291,6 +309,7 @@ class Game:
         return f"{seconds}.{centiSeconds:02}"
 
     def previousMoves(self):
+        """Let the player browse earlier board snapshots until they exit."""
         allTurns = len(self.moves)
         turnsBack = 2
         if turnsBack > allTurns:
@@ -321,9 +340,7 @@ class Game:
                 turnsBack = allTurns
 
     def run(self):
-        """
-        Main running loop for the game
-        """
+        """Run turns, update the board, and enforce game-ending conditions."""
         self.runs = True
         moves = []
         moveRule = 0 # 50-move rule counter        
@@ -365,6 +382,7 @@ class Game:
             if len(selfIF) <= 2 and len(otherIF) <= 2 and selfPieces == selfIF and otherPieces == otherIF:
                 self.draw(3) # Insufficient material
             repetition = 0
+            # Repetition is counted against the saved positions in the game history.
             for state in self.moves:
                 if state == self.board:
                     repetition += 1
@@ -432,6 +450,7 @@ class Game:
                         self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                         self.board[piece[1]][piece[0]] = 0
                         if inp[1] == 0 and isinstance(self.board[inp[1]][inp[0]], Pawn):
+                            # Automatically promote to a queen unless manual choice is enabled.
                             if self.autoPromote:
                                 self.board[inp[1]][inp[0]] = Queen(self.white)
                             else:
@@ -462,15 +481,14 @@ class Game:
                 self.clearDots(moves)
 
 class Knight:
-    """
-    Class for knight movement.
-    Dependent on class GUIechec from guiEchec.
-    """
+    """Represent a knight and calculate its legal destination candidates."""
 
     def __init__(self, White: bool):
+        """Create a knight with the given side color."""
         self.white = White
 
     def clicked(self, inp, Game, check: bool = False):
+        """Return available knight moves and the piece's current coordinates."""
         finalMoves = []
         if Game.white == self.white or check:
             moves = [
@@ -493,15 +511,14 @@ class Knight:
         return finalMoves, inp
 
 class Bishop:
-    """
-    Class for bishop movement.
-    Dependent on class GUIechec from guiEchec.
-    """
+    """Represent a bishop and calculate its legal destination candidates."""
 
     def __init__(self, White: bool):
+        """Create a bishop with the given side color."""
         self.white = White
 
     def clicked(self, inp, Game, check: bool = False):
+        """Return available bishop moves and the piece's current coordinates."""
         moves = []
         if Game.white == self.white or check:
             for i in range(1,8):
@@ -547,16 +564,15 @@ class Bishop:
         return moves, inp
 
 class Rook:
-    """
-    Class for rook movement.
-    Dependent on class GUIechec from guiEchec.
-    """
+    """Represent a rook and calculate its legal destination candidates."""
 
     def __init__(self, White: bool):
+        """Create a rook and mark it as unmoved."""
         self.white = White
         self.moved = False
 
     def clicked(self, inp, Game, check: bool = False):
+        """Return available rook moves and the piece's current coordinates."""
         moves = []
         if Game.white == self.white or check:
             for i in range(1,8):
@@ -602,16 +618,15 @@ class Rook:
         return moves, inp
 
 class King:
-    """
-    Class for king movement.
-    Dependent on class GUIechec from guiEchec.
-    """
+    """Represent a king and calculate its legal destination candidates."""
 
     def __init__(self, White: bool):
+        """Create a king and mark it as unmoved."""
         self.white = White
         self.moved = False
 
     def clicked(self, inp, Game, check: bool = False):
+        """Return available king moves and the piece's current coordinates."""
         finalMoves = []
         if Game.white == self.white or check:
             moves = [
@@ -633,6 +648,7 @@ class King:
                         finalMoves.append(move)
 
             if not self.moved: # Castling
+                # A rook must be present and unmoved, with clear squares between it and the king.
                 if isinstance(Game.board[7][0], Rook) and not Game.board[7][0].moved:
                     empty = True
                     for i in range(1,inp[0]):
@@ -650,15 +666,14 @@ class King:
         return finalMoves, inp
 
 class Queen:
-    """
-    Class for queen movement.
-    Dependent on class GUIechec from guiEchec.
-    """
+    """Represent a queen and calculate its legal destination candidates."""
 
     def __init__(self, White: bool):
+        """Create a queen with the given side color."""
         self.white = White
 
     def clicked(self, inp, Game, check: bool = False):
+        """Return available queen moves and the piece's current coordinates."""
         moves = []
         if Game.white == self.white or check:
             for i in range(1,8):
@@ -743,17 +758,17 @@ class Queen:
         return moves, inp
 
 class Pawn:
-    """
-    Class for pawn movement.
-    Dependent on class GUIechec from guiEchec.
-    """
+    """Represent a pawn and calculate its legal destination candidates."""
 
     def __init__(self, White: bool):
+        """Create a pawn with the given side color."""
         self.white = White
 
     def clicked(self, inp, Game, check: bool = False):
+        """Return available pawn moves and the piece's current coordinates."""
         moves = []
         if check:
+            # Pawns attack diagonally even when the target square is empty.
             if inp[0]+1 <= 7:
                 piece = Game.board[inp[1]+1][inp[0]+1]
                 if piece != 0:
@@ -796,11 +811,8 @@ class Pawn:
 
 # -------------------------------- Main program ------------------------------- #
 
-# If you want the menu and full options:
-game = Game()
-
-# If you want the board alone:
-# game = Game(True)
+if __name__ == "__main__":
+    game = Game()
 
 # Boards for tests:
 # game = Game([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
