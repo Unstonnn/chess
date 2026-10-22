@@ -2,8 +2,6 @@ from guiEchec import *
 from time import monotonic
 
 # ---------------------------------- Classes ---------------------------------- #
-# TODO: Look at previous moves
-# TODO: timer (and its win + draw conditions) (use datetime)
 
 class Game:
     """
@@ -163,11 +161,13 @@ class Game:
         if self.timer:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
 
-    def formattedBoard(self):
+    def formattedBoard(self, actBoard = None):
         board = []
-        for i in range(len(self.board)):
+        if actBoard is None:
+            actBoard = self.board
+        for i in range(len(actBoard)):
             board.append([])
-            for square in self.board[i]:
+            for square in actBoard[i]:
                 if square == 0:
                     board[i].append(0)
                 elif isinstance(square,Rook):
@@ -280,14 +280,45 @@ class Game:
             self.board[piece[1]][piece[0]] = actPiece
         return finalMoves
 
-    def formatTime(self, elapsedTime):
-        timeLeft = self.remainingTime[self.white] - elapsedTime
+    def formatTime(self):
+        self.elapsedTime = monotonic() - self.turnStarted
+        timeLeft = self.remainingTime[self.white] - self.elapsedTime
         centiSecondsLeft = max(0, int(timeLeft * 100))
         minutes, remainder = divmod(centiSecondsLeft, 6000)
         seconds, centiSeconds = divmod(remainder, 100)
         if minutes:
             return f"{minutes}:{seconds:02}.{centiSeconds:02}"
         return f"{seconds}.{centiSeconds:02}"
+
+    def previousMoves(self):
+        allTurns = len(self.moves)
+        turnsBack = 2
+        if turnsBack > allTurns:
+            return
+        while True:
+            if self.timer:
+                self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), self.formatTime())
+            else:
+                self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), "")
+
+            if self.timer:
+                inp = self.gui.waitClick(monotonic())
+            else:
+                inp = self.gui.waitClick()
+
+            if inp == '_L':
+                turnsBack += 1
+            elif inp == '_R':
+                turnsBack -= 1
+            elif inp == "_T":
+                continue
+            else:
+                return
+
+            if turnsBack == 1:
+                return
+            if turnsBack > allTurns:
+                turnsBack = allTurns
 
     def run(self):
         """
@@ -303,8 +334,7 @@ class Game:
             toSkip = False
 
             if self.timer:
-                elapsedTime = monotonic() - self.turnStarted
-                self.gui.refresh(self.formattedBoard(), self.formatTime(elapsedTime), self.dotBoard)
+                self.gui.refresh(self.formattedBoard(), self.formatTime(), self.dotBoard)
             else:
                 self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
 
@@ -342,7 +372,7 @@ class Game:
                 self.draw(2) # Repetition
             if moveRule >= 50:
                 self.draw(4) # 50-move rule
-            if self.timer and self.remainingTime[self.white] - elapsedTime <= 0:
+            if self.timer and self.remainingTime[self.white] - self.elapsedTime <= 0:
                 if len(otherIF) <= 2 and otherPieces == otherIF:
                     self.draw(1) # On time by insufficient material
                 else:
@@ -359,6 +389,9 @@ class Game:
             else:
                 inp = self.gui.waitClick()
 
+            if inp == '_L':
+                self.previousMoves()
+
             if inp == "_T":
                 continue
 
@@ -367,7 +400,7 @@ class Game:
                 return
 
             if inp == '_S':
-                exit()
+                raise SystemExit
 
             if moves != []:
                 for move in moves:
