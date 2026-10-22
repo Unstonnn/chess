@@ -53,14 +53,6 @@ game = Game(True)
 
 From the Windows menu, you can start a game, change options, or quit. The options include automatic or manual promotion and an optional clock with configurable starting time and increment.
 
-## Use from Python
-
-Import `Game` from `echec.py` to use it in another Python file:
-
-```python
-from echec import Game
-```
-
 ## Controls
 
 - **Mouse:** Select a piece and then its destination.
@@ -69,10 +61,42 @@ from echec import Game
 - **Close the game window:** Return to the menu.
 - **Escape:** Exit the application.
 
-## License
+## Use from Python
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+Import `Game` from `echec.py` to use it in another Python file:
+
+```python
+from echec import Game
+```
+
+## Build Windows executables
+
+The release executables can be built on Windows with PyInstaller. From the project directory, create and activate a Python 3.13 environment, then install the build dependencies:
+
+```powershell
+py -3.13 -m venv venv
+.\venv\Scripts\activate
+pip install pyinstaller pygame-ce inquirer==3.4.1 blessed readchar
+```
+
+The executable's game mode is determined by the `Game(...)` call in the `if __name__ == "__main__":` block of `echec.py` when you build it.
+
+For the menu version, make sure that block calls `Game()`, then run:
+
+```powershell
+pyinstaller --clean --onefile --name "chess" --add-data "Images;Images" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
+```
+
+For the board-only version, temporarily change the call to `Game(True)` and add `--noconsole`:
+
+```powershell
+pyinstaller --clean --noconsole --onefile --name "chessNoMenu" --add-data "Images;Images" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
+```
 
 ## Background and credits
 
 I created the chess game in `echec.py` for a computer science class. The graphical interface in `guiEchec.py`, the piece images in `Images`, and the `led.ttf` font were provided as pre-made resources; I did not create them.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
