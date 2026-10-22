@@ -388,7 +388,7 @@ class Game:
                     repetition += 1
             if repetition == 3:
                 self.draw(2) # Repetition
-            if moveRule >= 50:
+            if moveRule >= 100:
                 self.draw(4) # 50-move rule
             if self.timer and self.remainingTime[self.white] - self.elapsedTime <= 0:
                 if len(otherIF) <= 2 and otherPieces == otherIF:
