@@ -99,4 +99,4 @@ I created the chess game in `echec.py` for a computer science class. The graphic
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+This project is licensed under the MIT License. See [LICENSE](LICENSE). The included Stockfish engine is licensed under the GPLv3 License. See [Copying.txt](stockfish/Copying.txt).
