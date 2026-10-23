@@ -1,6 +1,8 @@
 from guiEchec import *
 from time import monotonic
 
+# cspell:ignore Stockfish, Singleplayer
+
 # ---------------------------------- Classes ---------------------------------- #
 
 class Game:
@@ -17,6 +19,7 @@ class Game:
         self.timer = False
         self.baseTime = 15
         self.increment = 10
+        self.playStockfish = False
         mainMenu = True
         GRAY = '\033[90m'
         RED  = '\033[91m'
@@ -72,7 +75,22 @@ class Game:
                                 ]
                     answers = inquirer.prompt(questions)
                     if answers["choice"] == "Start Game":
-                        startGame()
+                        try:
+                            from stockfish import Stockfish
+                            self.stockfish = Stockfish(path="stockfish/stockfish-windows-x86-64-universal.exe")
+                            questions = [
+                            inquirer.List("choice", message=f"\033[2J\033[H{RED}Select Game Mode",
+                                        choices=["Singleplayer", "Local Multiplayer", "Back"],
+                                        carousel=True)
+                                        ]
+                            answers = inquirer.prompt(questions)
+                            if answers["choice"] == "Singleplayer":
+                                startGame()
+                            elif answers["choice"] == "Local Multiplayer":
+                                pass
+                                self.playStockfish = True
+                        except:
+                            startGame()
                     elif answers["choice"] == "Options":
                         mainMenu = False
                     elif answers["choice"] == "Quit":
