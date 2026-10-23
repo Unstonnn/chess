@@ -1,11 +1,15 @@
 from guiEchec import *
 from time import monotonic
 import random
+from pathlib import Path
+import sys
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # cspell:ignore Stockfish, Singleplayer
+
+# TODO: Add castling and en passant support for stockfish (l551)
 
 # ---------------------------------- Classes ---------------------------------- #
 
@@ -46,7 +50,9 @@ class Game:
             print("Warning: Couldn't import ctypes")
         try:
             from stockfish import Stockfish
-            self.stockfish = Stockfish(path="stockfish/stockfish-windows-x86-64-universal.exe")
+            bundle_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+            stockfish_path = bundle_dir / "stockfish" / "stockfish-windows-x86-64-universal.exe"
+            self.stockfish = Stockfish(path=str(stockfish_path))
             self.stockfish.set_skill_level(5)
             hasStockfish = True
         except:
