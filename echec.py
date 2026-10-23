@@ -1,5 +1,6 @@
 from guiEchec import *
 from time import monotonic
+import random
 
 # cspell:ignore Stockfish, Singleplayer
 
@@ -24,6 +25,9 @@ class Game:
         mainMenu = True
         mainOptions = True
         skillLevel = "Medium"
+        self.playingWhite = True
+        playedColor = "Random"
+        colorEnum = {"Random": "White", "White": "Black", "Black": "Random"}
         GRAY = '\033[90m'
         RED  = '\033[91m'
 
@@ -99,6 +103,12 @@ class Game:
                                         ]
                             answers = inquirer.prompt(questions)
                             if answers["choice"] == "Singleplayer":
+                                if playedColor == "White":
+                                    self.playingWhite = True
+                                elif playedColor == "Black":
+                                    self.playingWhite = False
+                                else:
+                                    self.playingWhite = random.choice([True, False])
                                 self.playStockfish = True
                                 startGame()
                             elif answers["choice"] == "Local Multiplayer":
@@ -162,16 +172,19 @@ class Game:
                             mainOptions = False
                     else:
                         bestMove = f"Show Best Move — {self.showBestMove}"
+                        chosenColor = f"Played Color — {playedColor}"
                         questions = [
                         inquirer.List("choice", message=f"\033[2J\033[H{RED}Singleplayer Options",
-                                    choices=["Difficulty", bestMove, "Back"],
+                                    choices=["Difficulty", chosenColor, bestMove, "Back"],
                                     carousel=True)
                                     ]
                         answers = inquirer.prompt(questions)
                         if answers["choice"] == "Back":
                             mainOptions = True
-                        if answers["choice"] == bestMove:
+                        elif answers["choice"] == bestMove:
                             self.showBestMove = not self.showBestMove
+                        elif answers["choice"] == chosenColor:
+                            playedColor = colorEnum[playedColor]
                         elif answers["choice"] == "Difficulty":
                             questions = [
                             inquirer.List("choice", message=f"\033[2J\033[H{RED}Difficulty",
@@ -443,73 +456,35 @@ class Game:
         else:
             turn = "b"
 
+        castling = ''
         if self.white:
-            castling = ''
-            if isinstance(self.board[7][4], King):
+            if isinstance(self.board[7][4], King) and not self.board[7][4].moved:
                 if isinstance(self.board[7][7], Rook) and not self.board[7][7].moved:
-                    empty = True
-                    for i in range(5,7):
-                        if self.board[7][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('K')
+                    castling += 'K'
                 if isinstance(self.board[7][0], Rook) and not self.board[7][0].moved:
-                    empty = True
-                    for i in range(1,4):
-                        if self.board[7][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('Q')
-            if isinstance(self.board[0][4], King):
+                    castling += 'Q'
+            if isinstance(self.board[0][4], King) and not self.board[0][4].moved:
                 if isinstance(self.board[0][7], Rook) and not self.board[0][7].moved:
-                    empty = True
-                    for i in range(5,7):
-                        if self.board[0][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('k')
+                    castling += 'k'
                 if isinstance(self.board[0][0], Rook) and not self.board[0][0].moved:
-                    empty = True
-                    for i in range(1,4):
-                        if self.board[0][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('q')
+                    castling += 'q'
         else:
-            if isinstance(self.board[0][3], King):
-                if isinstance(self.board[0][7], Rook) and not self.board[0][7].moved:
-                    empty = True
-                    for i in range(4,7):
-                        if self.board[0][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('K')
+            if isinstance(self.board[0][3], King) and not self.board[0][3].moved:
                 if isinstance(self.board[0][0], Rook) and not self.board[0][0].moved:
-                    empty = True
-                    for i in range(1,3):
-                        if self.board[0][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('Q')
-            if isinstance(self.board[7][3], King):
-                if isinstance(self.board[7][7], Rook) and not self.board[7][7].moved:
-                    empty = True
-                    for i in range(4,7):
-                        if self.board[7][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('k')
+                    castling += 'K'
+                if isinstance(self.board[0][7], Rook) and not self.board[0][7].moved:
+                    castling += 'Q'
+            if isinstance(self.board[7][3], King) and not self.board[7][3].moved:
                 if isinstance(self.board[7][0], Rook) and not self.board[7][0].moved:
-                    empty = True
-                    for i in range(1,3):
-                        if self.board[7][i] != 0:
-                            empty = False
-                    if empty:
-                        castling.append('q')
+                    castling += 'k'
+                if isinstance(self.board[7][7], Rook) and not self.board[7][7].moved:
+                    castling += 'q'
         if castling == '':
             castling = '-'
-
+        
         board = self.formattedBoard()
+        if self.white:
+            board = self.reversedBoard(board)
         rowsFEN = []
 
         for row in board:
@@ -526,9 +501,9 @@ class Game:
                     rowFEN += pieceMap[square]
                     
             if emptyCount > 0:
-                fen_row += str(emptyCount)
+                rowFEN += str(emptyCount)
                 
-            rowsFEN.append(fen_row)
+            rowsFEN.append(rowFEN)
             
         # Join the rows with slashes
         layout = "/".join(rowsFEN)
@@ -539,7 +514,7 @@ class Game:
     def run(self):
         """Run turns, update the board, and enforce game-ending conditions."""
         self.runs = True
-        moves = []       
+        moves = []
         if self.timer:
             self.turnStarted = monotonic()
 
@@ -602,7 +577,7 @@ class Game:
                 inp = self.gui.waitClick(monotonic())
             else:
                 inp = self.gui.waitClick()
-            # print(inp)
+            print(inp)
 
             if inp == '_L':
                 self.previousMoves()
@@ -648,6 +623,8 @@ class Game:
                                 self.board[inp[1]][inp[0]] = Queen(self.white)
                             else:
                                 self.board[inp[1]][inp[0]] = self.manualPromotion()
+                                if isinstance(self.board[inp[1]][inp[0]], Rook):
+                                    self.board[inp[1]][inp[0]].moved = True
                         elif isinstance(self.board[inp[1]][inp[0]], King):
                             self.board[inp[1]][inp[0]].moved = True
                         elif isinstance(self.board[inp[1]][inp[0]], Rook):
