@@ -128,9 +128,9 @@ class Game:
                                 if inp > 0 and inp <= 720:
                                     self.baseTime = inp
                                 else:
-                                    print("Number out of range")
+                                    input("Number out of range")
                             except:
-                                print("Please enter an integer")
+                                input("Please enter an integer")
                         elif answers["choice"] == options[3]:
                             inp = input("\033[2J\033[HIncrement (in seconds): ")
                             try:
@@ -138,9 +138,9 @@ class Game:
                                 if inp >= 0 and inp <= 240:
                                     self.increment = inp
                                 else:
-                                    print("Number out of range")
+                                    input("Number out of range")
                             except:
-                                print("Please enter an integer")
+                                input("Please enter an integer")
 
     def manualPromotion(self):
         """Ask the player to choose a piece when a pawn is promoted."""
