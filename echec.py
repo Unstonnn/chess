@@ -242,7 +242,10 @@ class Game:
             self.remainingTime[self.white] += self.increment
             self.turnStarted = monotonic()
         self.white = not self.white
-        self.gui.flipNum = not self.white
+        if self.playStockfish:
+            self.gui.flipNum = not self.playingWhite
+        else:
+            self.gui.flipNum = not self.white
         self.board = list(reversed(self.board))
         self.board = [list(reversed(row)) for row in self.board]
         if self.white:
@@ -267,7 +270,11 @@ class Game:
         # Keep a board snapshot so previous positions can be displayed and compared.
         self.moves = [[row.copy() for row in self.board]]
         self.dotBoard = [[0 for i in range(8)] for j in range(8)]
-        self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
+        self.gui.flipNum = not self.playingWhite
+        if self.playStockfish and not self.playingWhite:
+            self.gui.refresh(self.reversedBoard(self.formattedBoard()), "", self.dotBoard)
+        else:
+            self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
         self.white = True
         self.halfMoves = 0 # 50-move rule counter
         self.fullMoves = 1
@@ -520,22 +527,26 @@ class Game:
         endX = ord(uci[2]) - ord('a')
         startY = 8 - int(uci[1])
         endY = 8 - int(uci[3])
+        if not self.white:
+            startX, startY = 7 - startX, 7 - startY
+            endX, endY = 7 - endX, 7 - endY
         
         promotion = uci[4] if len(uci) > 4 else None
         if promotion == 'q':
-            promotion = Queen()
+            promotion = Queen(self.white)
         elif promotion == 'r':
-            promotion = Rook()
+            promotion = Rook(self.white)
+            promotion.moved = True
         elif promotion == 'b':
-            promotion = Bishop()
+            promotion = Bishop(self.white)
         elif promotion == 'n':
-            promotion = Knight()
+            promotion = Knight(self.white)
         
         return (startX, startY), (endX, endY), promotion
 
-    def getStockfishMove(self, fen):
+    def getStockfishMove(self):
         """Pass the FEN to the wrapper and extract both best and ponder moves."""
-        self.stockfish.set_fen_position(fen)
+        self.stockfish.set_fen_position(self.fen)
         bestMove = self.stockfish.get_best_move()
         raw = self.stockfish.raw_stockfish_output(self.stockfish.get_best_move)
         ponder = None
@@ -550,17 +561,31 @@ class Game:
                 break
         return bestMove, ponder, eval
 
+    def formatAnalysis(self, ponder, eval):
+        return f"{eval['type']} {eval['value']} | {ponder}"
+
     def run(self):
         """Run turns, update the board, and enforce game-ending conditions."""
         self.runs = True
         moves = []
+        self.fen = self.formatFEN()
+        try:
+            bestMove, ponder, eval = self.getStockfishMove()
+            ponder = bestMove
+        except:
+            pass
         if self.timer and not self.playStockfish:
             self.turnStarted = monotonic()
 
         while self.runs:
             toSkip = False
 
-            if self.timer and not self.playStockfish:
+            if self.playStockfish:
+                if self.white != self.playingWhite:
+                    self.gui.refresh(self.reversedBoard(self.formattedBoard()), self.formatAnalysis(ponder, eval), self.dotBoard)
+                else:
+                    self.gui.refresh(self.formattedBoard(), self.formatAnalysis(ponder, eval), self.dotBoard)
+            elif self.timer:
                 self.gui.refresh(self.formattedBoard(), self.formatTime(), self.dotBoard)
             else:
                 self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
@@ -612,13 +637,14 @@ class Game:
                     if inp is None or inp == '_S':
                         return
 
-            if not self.playStockfish:
-                if self.timer:
+            if self.white != self.playingWhite and self.playStockfish:
+                bestMove, ponder, eval = self.getStockfishMove()
+                piece, inp, promotion = self.uciToGameFormat(bestMove)
+                moves = [inp]
+            else:
+                if self.timer and not self.playStockfish:
                     inp = self.gui.waitClick(monotonic())
                 else:
-                    inp = self.gui.waitClick()
-            else:
-                if self.white == self.playingWhite:
                     inp = self.gui.waitClick()
             # print(inp)
 
@@ -631,17 +657,17 @@ class Game:
             if inp == '_S':
                 return
 
-            if inp.upper() == 'F':
+            if isinstance(inp, str) and inp.upper() == 'A':
                 try:
-                    print(self.getStockfishMove(self.formatFEN()))
+                    print(self.formatAnalysis(ponder, eval))
                 except:
-                    pass
+                    try: # Warning: Stockfish's best move here is the bot level's best move
+                        print(self.getStockfishMove())
+                    except:
+                        pass
 
-            if inp.upper() == 'A':
-                try:
-                    print(self.formatFEN())
-                except:
-                    pass
+            if isinstance(inp, str) and inp.upper() == 'F':
+                print(self.fen)
 
             if moves != []:
                 for move in moves:
@@ -654,6 +680,7 @@ class Game:
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             toSkip = True
+                            self.fen = self.formatFEN()
                             # print(self.isInCheck())
                             break
                         elif move[0] == inp and isinstance(self.board[piece[1]][piece[0]], King): # castling logic
@@ -667,6 +694,7 @@ class Game:
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             toSkip = True
+                            self.fen = self.formatFEN()
                             # print(self.isInCheck())
                             break
                     if move == inp:
@@ -674,7 +702,9 @@ class Game:
                         self.board[piece[1]][piece[0]] = 0
                         if inp[1] == 0 and isinstance(self.board[inp[1]][inp[0]], Pawn):
                             # Automatically promote to a queen unless manual choice is enabled.
-                            if self.autoPromote:
+                            if self.playingWhite != self.white and self.playStockfish:
+                                self.board[inp[1]][inp[0]] = promotion
+                            elif self.autoPromote:
                                 self.board[inp[1]][inp[0]] = Queen(self.white)
                             else:
                                 self.board[inp[1]][inp[0]] = self.manualPromotion()
@@ -688,9 +718,19 @@ class Game:
                             self.halfMoves = 0
                         else:
                             self.halfMoves += 1
+                        isDoublePawnMove = isinstance(self.board[inp[1]][inp[0]], Pawn) and piece[1] - inp[1] == 2
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
                         toSkip = True
+                        if isDoublePawnMove:
+                            targetX = inp[0] if not self.white else 7 - inp[0]
+                            targetY = (piece[1] + inp[1]) // 2
+                            if self.white:
+                                targetY = 7 - targetY
+                            enPassant = f"{'abcdefgh'[targetX]}{8 - targetY}"
+                            self.fen = self.formatFEN(enPassant)
+                        else:
+                            self.fen = self.formatFEN()
                         # print(self.isInCheck())
                         break
 
