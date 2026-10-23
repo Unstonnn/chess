@@ -20,7 +20,10 @@ class Game:
         self.baseTime = 15
         self.increment = 10
         self.playStockfish = False
+        self.showBestMove = False
         mainMenu = True
+        mainOptions = True
+        skillLevel = "Medium"
         GRAY = '\033[90m'
         RED  = '\033[91m'
 
@@ -29,6 +32,13 @@ class Game:
             import ctypes
         except:
             skip = True
+        try:
+            from stockfish import Stockfish
+            self.stockfish = Stockfish(path="stockfish/stockfish-windows-x86-64-universal.exe")
+            self.stockfish.set_skill_level(5)
+            hasStockfish = True
+        except:
+            hasStockfish = False
         while True:
             if skip:
                 self.initiate()
@@ -75,9 +85,7 @@ class Game:
                                 ]
                     answers = inquirer.prompt(questions)
                     if answers["choice"] == "Start Game":
-                        try:
-                            from stockfish import Stockfish
-                            self.stockfish = Stockfish(path="stockfish/stockfish-windows-x86-64-universal.exe")
+                        if hasStockfish:
                             questions = [
                             inquirer.List("choice", message=f"\033[2J\033[H{RED}Select Game Mode",
                                         choices=["Singleplayer", "Local Multiplayer", "Back"],
@@ -85,62 +93,107 @@ class Game:
                                         ]
                             answers = inquirer.prompt(questions)
                             if answers["choice"] == "Singleplayer":
+                                self.playStockfish = True
                                 startGame()
                             elif answers["choice"] == "Local Multiplayer":
-                                pass
-                                self.playStockfish = True
-                        except:
+                                self.playStockfish = False
+                                startGame()
+                        else:
                             startGame()
                     elif answers["choice"] == "Options":
                         mainMenu = False
                     elif answers["choice"] == "Quit":
                         break
                 else:
-                    if not self.timer:
-                        options = [f"Auto Promotion — {self.autoPromote}",
-                                f"Timer — {self.timer}",
-                                f"{GRAY}Starting Time — {self.baseTime}",
-                                f"{GRAY}Increment — {self.increment}",
-                                "Back"]
+                    if mainOptions:
+                        if not self.timer:
+                            options = [f"Auto Promotion — {self.autoPromote}",
+                                    f"Timer — {self.timer}",
+                                    f"{GRAY}Starting Time — {self.baseTime}",
+                                    f"{GRAY}Increment — {self.increment}"]
+                        else:
+                            options = [f"Auto Promotion — {self.autoPromote}",
+                                    f"Timer — {self.timer}",
+                                    f"Starting Time — {self.baseTime}",
+                                    f"Increment — {self.increment}"]
+                        if hasStockfish:
+                            options.append("Singleplayer Options")
+                        options.append("Back")
+                        questions = [
+                        inquirer.List("choice", message=f"\033[2J\033[H{RED}Options",
+                                    choices=options,
+                                    carousel=True)
+                                    ]
+                        answers = inquirer.prompt(questions)
+                        if answers["choice"] == "Back":
+                            mainMenu = True
+                        elif answers["choice"] == options[0]:
+                            self.autoPromote = not self.autoPromote
+                        elif answers["choice"] == options[1]:
+                            self.timer = not self.timer
+                        elif self.timer:
+                            if answers["choice"] == options[2]:
+                                inp = input("\033[2J\033[HStarting Time (in minutes): ")
+                                try:
+                                    inp = int(inp)
+                                    if inp > 0 and inp <= 720:
+                                        self.baseTime = inp
+                                    else:
+                                        input("Number out of range")
+                                except:
+                                    input("Please enter an integer")
+                            elif answers["choice"] == options[3]:
+                                inp = input("\033[2J\033[HIncrement (in seconds): ")
+                                try:
+                                    inp = int(inp)
+                                    if inp >= 0 and inp <= 240:
+                                        self.increment = inp
+                                    else:
+                                        input("Number out of range")
+                                except:
+                                    input("Please enter an integer")
+                        elif answers["choice"] == "Singleplayer Options":
+                            mainOptions = False
                     else:
-                        options = [f"Auto Promotion — {self.autoPromote}",
-                                f"Timer — {self.timer}",
-                                f"Starting Time — {self.baseTime}",
-                                f"Increment — {self.increment}",
-                                "Back"]
-                    questions = [
-                    inquirer.List("choice", message=f"\033[2J\033[H{RED}Options",
-                                choices=options,
-                                carousel=True)
-                                ]
-                    answers = inquirer.prompt(questions)
-                    if answers["choice"] == "Back":
-                        mainMenu = True
-                    elif answers["choice"] == options[0]:
-                        self.autoPromote = not self.autoPromote
-                    elif answers["choice"] == options[1]:
-                        self.timer = not self.timer
-                    elif self.timer:
-                        if answers["choice"] == options[2]:
-                            inp = input("\033[2J\033[HStarting Time (in minutes): ")
-                            try:
-                                inp = int(inp)
-                                if inp > 0 and inp <= 720:
-                                    self.baseTime = inp
-                                else:
-                                    input("Number out of range")
-                            except:
-                                input("Please enter an integer")
-                        elif answers["choice"] == options[3]:
-                            inp = input("\033[2J\033[HIncrement (in seconds): ")
-                            try:
-                                inp = int(inp)
-                                if inp >= 0 and inp <= 240:
-                                    self.increment = inp
-                                else:
-                                    input("Number out of range")
-                            except:
-                                input("Please enter an integer")
+                        bestMove = f"Show Best Move — {self.showBestMove}"
+                        questions = [
+                        inquirer.List("choice", message=f"\033[2J\033[H{RED}Singleplayer Options",
+                                    choices=["Difficulty", bestMove, "Back"],
+                                    carousel=True)
+                                    ]
+                        answers = inquirer.prompt(questions)
+                        if answers["choice"] == "Back":
+                            mainOptions = True
+                        if answers["choice"] == bestMove:
+                            self.showBestMove = not self.showBestMove
+                        elif answers["choice"] == "Difficulty":
+                            questions = [
+                            inquirer.List("choice", message=f"\033[2J\033[H{RED}Difficulty",
+                                        choices=["Easy", "Medium", "Hard", "Impossible", "Other", "Back"],
+                                        default=skillLevel,
+                                        carousel=True)
+                                        ]
+                            answers = inquirer.prompt(questions)
+                            if answers["choice"] != "Back":
+                                skillLevel = answers["choice"]
+                            if answers["choice"] == "Easy":
+                                self.stockfish.set_skill_level(1)
+                            elif answers["choice"] == "Medium":
+                                self.stockfish.set_skill_level(5)
+                            elif answers["choice"] == "Hard":
+                                self.stockfish.set_skill_level(13)
+                            elif answers["choice"] == "Impossible":
+                                self.stockfish.set_skill_level(20)
+                            elif answers["choice"] == "Other":
+                                inp = input("\033[2J\033[HSkill Level (1-20): ")
+                                try:
+                                    inp = int(inp)
+                                    if inp >= 1 and inp <= 20:
+                                        self.stockfish.set_skill_level(inp)
+                                    else:
+                                        input("Number out of range")
+                                except:
+                                    input("Please enter an integer")
 
     def manualPromotion(self):
         """Ask the player to choose a piece when a pawn is promoted."""
@@ -162,6 +215,8 @@ class Game:
         self.gui.flipNum = self.white
         self.board = list(reversed(self.board))
         self.board = [list(reversed(row)) for row in self.board]
+        if self.white:
+            self.fullMoves += 1
 
     def clearDots(self,  moves: list = []):
         """Clear highlighted squares, then mark the supplied legal moves."""
@@ -184,6 +239,8 @@ class Game:
         self.dotBoard = [[0 for i in range(8)] for j in range(8)]
         self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
         self.white = True
+        self.halfMoves = 0 # 50-move rule counter
+        self.fullMoves = 1
         if self.timer:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
 
@@ -357,11 +414,113 @@ class Game:
             if turnsBack > allTurns:
                 turnsBack = allTurns
 
+    def formatFEN(self, enPassant='-'):
+        pieceMap = {
+        'BR': 'r', 'BN': 'n', 'BB': 'b', 'BQ': 'q', 'BK': 'k', 'BP': 'p',
+        'WR': 'R', 'WN': 'N', 'WB': 'B', 'WQ': 'Q', 'WK': 'K', 'WP': 'P'
+        }
+        if self.white:
+            turn = 'w'
+        else:
+            turn = "b"
+
+        if self.white:
+            castling = ''
+            if isinstance(self.board[7][4], King):
+                if isinstance(self.board[7][7], Rook) and not self.board[7][7].moved:
+                    empty = True
+                    for i in range(5,7):
+                        if self.board[7][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('K')
+                if isinstance(self.board[7][0], Rook) and not self.board[7][0].moved:
+                    empty = True
+                    for i in range(1,4):
+                        if self.board[7][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('Q')
+            if isinstance(self.board[0][4], King):
+                if isinstance(self.board[0][7], Rook) and not self.board[0][7].moved:
+                    empty = True
+                    for i in range(5,7):
+                        if self.board[0][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('k')
+                if isinstance(self.board[0][0], Rook) and not self.board[0][0].moved:
+                    empty = True
+                    for i in range(1,4):
+                        if self.board[0][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('q')
+        else:
+            if isinstance(self.board[0][3], King):
+                if isinstance(self.board[0][7], Rook) and not self.board[0][7].moved:
+                    empty = True
+                    for i in range(4,7):
+                        if self.board[0][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('K')
+                if isinstance(self.board[0][0], Rook) and not self.board[0][0].moved:
+                    empty = True
+                    for i in range(1,3):
+                        if self.board[0][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('Q')
+            if isinstance(self.board[7][3], King):
+                if isinstance(self.board[7][7], Rook) and not self.board[7][7].moved:
+                    empty = True
+                    for i in range(4,7):
+                        if self.board[7][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('k')
+                if isinstance(self.board[7][0], Rook) and not self.board[7][0].moved:
+                    empty = True
+                    for i in range(1,3):
+                        if self.board[7][i] != 0:
+                            empty = False
+                    if empty:
+                        castling.append('q')
+        if castling == '':
+            castling = '-'
+
+        board = self.formattedBoard()
+        rowsFEN = []
+
+        for row in board:
+            emptyCount = 0
+            rowFEN = ""
+            
+            for square in row:
+                if square == 0:
+                    emptyCount += 1
+                else:
+                    if emptyCount > 0:
+                        rowFEN += str(emptyCount)
+                        emptyCount = 0
+                    rowFEN += pieceMap[square]
+                    
+            if emptyCount > 0:
+                fen_row += str(emptyCount)
+                
+            rowsFEN.append(fen_row)
+            
+        # Join the rows with slashes
+        layout = "/".join(rowsFEN)
+        
+        # FEN requires 6 parts separated by spaces
+        return f"{layout} {turn} {castling} {enPassant} {self.halfMoves} {self.fullMoves}"
+
     def run(self):
         """Run turns, update the board, and enforce game-ending conditions."""
         self.runs = True
-        moves = []
-        moveRule = 0 # 50-move rule counter        
+        moves = []       
         if self.timer:
             self.turnStarted = monotonic()
 
@@ -406,7 +565,7 @@ class Game:
                     repetition += 1
             if repetition == 3:
                 self.draw(2) # Repetition
-            if moveRule >= 100:
+            if self.halfMoves >= 100:
                 self.draw(4) # 50-move rule
             if self.timer and self.remainingTime[self.white] - self.elapsedTime <= 0:
                 if len(otherIF) <= 2 and otherPieces == otherIF:
@@ -424,6 +583,7 @@ class Game:
                 inp = self.gui.waitClick(monotonic())
             else:
                 inp = self.gui.waitClick()
+            # print(inp)
 
             if inp == '_L':
                 self.previousMoves()
@@ -441,7 +601,7 @@ class Game:
                             self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                             self.board[piece[1]][piece[0]] = 0
                             self.board[move[1][1]][move[1][0]] = 0
-                            moveRule = 0
+                            self.halfMoves = 0
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             toSkip = True
@@ -454,7 +614,7 @@ class Game:
                             self.board[move[2][1]][move[2][0]] = 0
                             self.board[inp[1]][inp[0]].moved = True
                             self.board[move[1][1]][move[1][0]].moved = True
-                            moveRule += 1
+                            self.halfMoves += 1
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             toSkip = True
@@ -474,9 +634,9 @@ class Game:
                         elif isinstance(self.board[inp[1]][inp[0]], Rook):
                             self.board[inp[1]][inp[0]].moved = True
                         if self.moves[-1][inp[1]][inp[0]] != 0 or isinstance(self.board[inp[1]][inp[0]], Pawn):
-                            moveRule = 0
+                            self.halfMoves = 0
                         else:
-                            moveRule += 1
+                            self.halfMoves += 1
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
                         toSkip = True
