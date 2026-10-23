@@ -16,9 +16,9 @@ A chess game built in Python with Pygame. Play locally or against Stockfish, cho
 
 - Python 3.9 or newer
 - The packages listed in [requirements.txt](requirements.txt)
-- The included Windows Stockfish executable at `stockfish/stockfish-windows-x86-64-universal.exe` for single-player games.
+- A Stockfish executable for single-player games. Download it from [stockfishchess.org](https://stockfishchess.org/) and place it in the project's `stockfish` folder as `stockfish-windows-x86-64-universal.exe`.
 
-The included Stockfish executable is Windows-specific, so Stockfish single-player is available on Windows. The interactive menu is Windows-specific. The board-only game can also be used on macOS and Linux. The chess game in `echec.py` depends on `guiEchec.py` for its graphical interface. Keep `guiEchec.py`, the `Images` folder, and `led.ttf` alongside `echec.py`.
+The Stockfish executable used by this project is Windows-specific, so Stockfish single-player is available on Windows. The interactive menu is Windows-specific. The board-only game can also be used on macOS and Linux. The chess game in `echec.py` depends on `guiEchec.py` for its graphical interface. Keep `guiEchec.py`, the `Images` folder, and `led.ttf` alongside `echec.py`.
 
 ## Install and run
 
@@ -76,7 +76,7 @@ from echec import Game
 
 ## Build Windows executables
 
-The release executables can be built on Windows with PyInstaller. From the project directory, create and activate a Python 3.13 environment, then install the build dependencies:
+The release executables can be built on Windows with PyInstaller. To include Stockfish in the release executable, first download it as described above. From the project directory, create and activate a Python 3.13 environment, then install the build dependencies:
 
 ```powershell
 py -3.13 -m venv venv
@@ -104,4 +104,4 @@ I created the chess game in `echec.py` for a computer science class. The graphic
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE). The included Stockfish engine is licensed under the GPLv3 License. See [Copying.txt](stockfish/Copying.txt).
+This project is licensed under the MIT License. See [LICENSE](LICENSE). Stockfish is not included in this project. If you choose to download and use it, Stockfish is a separate program distributed under the GPLv3 License; see the license provided with your Stockfish download.
