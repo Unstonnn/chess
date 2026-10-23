@@ -2,6 +2,9 @@ from guiEchec import *
 from time import monotonic
 import random
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 # cspell:ignore Stockfish, Singleplayer
 
 # ---------------------------------- Classes ---------------------------------- #
@@ -21,7 +24,7 @@ class Game:
         self.baseTime = 15
         self.increment = 10
         self.playStockfish = False
-        self.showBestMove = False
+        self.showAnalysis = False
         mainMenu = True
         mainOptions = True
         skillLevel = "Medium"
@@ -48,7 +51,7 @@ class Game:
             hasStockfish = True
         except:
             hasStockfish = False
-            input("Warning: Couldn't import Stockfish from stockfish")
+            input("Warning: Couldn't import stockfish")
         while True:
             if skip:
                 self.initiate()
@@ -171,8 +174,8 @@ class Game:
                         elif answers["choice"] == "Singleplayer Options":
                             mainOptions = False
                     else:
-                        bestMove = f"Show Best Move — {self.showBestMove}"
-                        chosenColor = f"Played Color — {playedColor}"
+                        bestMove = f"Analysis — {self.showAnalysis}"
+                        chosenColor = f"Color played — {playedColor}"
                         questions = [
                         inquirer.List("choice", message=f"\033[2J\033[H{RED}Singleplayer Options",
                                     choices=["Difficulty", chosenColor, bestMove, "Back"],
@@ -182,7 +185,7 @@ class Game:
                         if answers["choice"] == "Back":
                             mainOptions = True
                         elif answers["choice"] == bestMove:
-                            self.showBestMove = not self.showBestMove
+                            self.showAnalysis = not self.showAnalysis
                         elif answers["choice"] == chosenColor:
                             playedColor = colorEnum[playedColor]
                         elif answers["choice"] == "Difficulty":
@@ -202,7 +205,7 @@ class Game:
                             elif answers["choice"] == "Hard":
                                 self.stockfish.set_skill_level(13)
                             elif answers["choice"] == "Impossible":
-                                self.stockfish.set_skill_level(20)
+                                self.stockfish.resume_full_strength()
                             elif answers["choice"] == "Other":
                                 inp = input("\033[2J\033[HSkill Level (1-20): ")
                                 try:
@@ -234,12 +237,12 @@ class Game:
 
     def reverse(self):
         """Switch the active player and rotate the board for that player's view."""
-        if self.timer:
+        if self.timer and not self.playStockfish:
             self.remainingTime[self.white] -= monotonic() - self.turnStarted
             self.remainingTime[self.white] += self.increment
             self.turnStarted = monotonic()
         self.white = not self.white
-        self.gui.flipNum = self.white
+        self.gui.flipNum = not self.white
         self.board = list(reversed(self.board))
         self.board = [list(reversed(row)) for row in self.board]
         if self.white:
@@ -268,7 +271,7 @@ class Game:
         self.white = True
         self.halfMoves = 0 # 50-move rule counter
         self.fullMoves = 1
-        if self.timer:
+        if self.timer and not self.playStockfish:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
 
     def formattedBoard(self, actBoard = None):
@@ -417,7 +420,7 @@ class Game:
         if turnsBack > allTurns:
             return
         while True:
-            if self.timer:
+            if self.timer and not self.playStockfish:
                 text = self.formatTime()
             else:
                 text = ""
@@ -427,7 +430,7 @@ class Game:
                 self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), text)
 
 
-            if self.timer:
+            if self.timer and not self.playStockfish:
                 inp = self.gui.waitClick(monotonic())
             else:
                 inp = self.gui.waitClick()
@@ -483,7 +486,7 @@ class Game:
             castling = '-'
         
         board = self.formattedBoard()
-        if self.white:
+        if not self.white:
             board = self.reversedBoard(board)
         rowsFEN = []
 
@@ -511,17 +514,53 @@ class Game:
         # FEN requires 6 parts separated by spaces
         return f"{layout} {turn} {castling} {enPassant} {self.halfMoves} {self.fullMoves}"
 
+    def uciToGameFormat(self, uci):
+        """Convert a UCI string to the program's coordinate system."""
+        startX = ord(uci[0]) - ord('a')
+        endX = ord(uci[2]) - ord('a')
+        startY = 8 - int(uci[1])
+        endY = 8 - int(uci[3])
+        
+        promotion = uci[4] if len(uci) > 4 else None
+        if promotion == 'q':
+            promotion = Queen()
+        elif promotion == 'r':
+            promotion = Rook()
+        elif promotion == 'b':
+            promotion = Bishop()
+        elif promotion == 'n':
+            promotion = Knight()
+        
+        return (startX, startY), (endX, endY), promotion
+
+    def getStockfishMove(self, fen):
+        """Pass the FEN to the wrapper and extract both best and ponder moves."""
+        self.stockfish.set_fen_position(fen)
+        bestMove = self.stockfish.get_best_move()
+        raw = self.stockfish.raw_stockfish_output(self.stockfish.get_best_move)
+        ponder = None
+        eval = self.stockfish.get_evaluation()
+
+        for line in raw:
+            if line.startswith("bestmove"):
+                parts = line.split()
+                # Line format: bestmove e2e4 ponder g8f6
+                if len(parts) >= 4 and parts[2] == "ponder":
+                    ponder = parts[3]
+                break
+        return bestMove, ponder, eval
+
     def run(self):
         """Run turns, update the board, and enforce game-ending conditions."""
         self.runs = True
         moves = []
-        if self.timer:
+        if self.timer and not self.playStockfish:
             self.turnStarted = monotonic()
 
         while self.runs:
             toSkip = False
 
-            if self.timer:
+            if self.timer and not self.playStockfish:
                 self.gui.refresh(self.formattedBoard(), self.formatTime(), self.dotBoard)
             else:
                 self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
@@ -561,7 +600,7 @@ class Game:
                 self.draw(2) # Repetition
             if self.halfMoves >= 100:
                 self.draw(4) # 50-move rule
-            if self.timer and self.remainingTime[self.white] - self.elapsedTime <= 0:
+            if self.timer and not self.playStockfish and self.remainingTime[self.white] - self.elapsedTime <= 0:
                 if len(otherIF) <= 2 and otherPieces == otherIF:
                     self.draw(1) # On time by insufficient material
                 else:
@@ -573,11 +612,15 @@ class Game:
                     if inp is None or inp == '_S':
                         return
 
-            if self.timer:
-                inp = self.gui.waitClick(monotonic())
+            if not self.playStockfish:
+                if self.timer:
+                    inp = self.gui.waitClick(monotonic())
+                else:
+                    inp = self.gui.waitClick()
             else:
-                inp = self.gui.waitClick()
-            print(inp)
+                if self.white == self.playingWhite:
+                    inp = self.gui.waitClick()
+            # print(inp)
 
             if inp == '_L':
                 self.previousMoves()
@@ -587,6 +630,18 @@ class Game:
 
             if inp == '_S':
                 return
+
+            if inp.upper() == 'F':
+                try:
+                    print(self.getStockfishMove(self.formatFEN()))
+                except:
+                    pass
+
+            if inp.upper() == 'A':
+                try:
+                    print(self.formatFEN())
+                except:
+                    pass
 
             if moves != []:
                 for move in moves:
