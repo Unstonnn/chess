@@ -29,9 +29,14 @@ class Game:
 
         try:
             import inquirer
+        except:
+            print("Warning: Couldn't import inquirer")
+            skip = True
+        try:
             import ctypes
         except:
             skip = True
+            print("Warning: Couldn't import ctypes")
         try:
             from stockfish import Stockfish
             self.stockfish = Stockfish(path="stockfish/stockfish-windows-x86-64-universal.exe")
@@ -39,6 +44,7 @@ class Game:
             hasStockfish = True
         except:
             hasStockfish = False
+            print("Warning: Couldn't import ctypes")
         while True:
             if skip:
                 self.initiate()
@@ -204,6 +210,14 @@ class Game:
             choice = self.gui.waitClick()
             if isinstance(choice, str) and choice.upper() in choices:
                 return choices[choice.upper()](self.white)
+
+    def reversedBoard(self, board = None):
+        if board is None:
+            board = self.board
+        actBoard = [row.copy() for row in board]
+        actBoard = list(reversed(actBoard))
+        actBoard = [list(reversed(row)) for row in actBoard]
+        return actBoard
 
     def reverse(self):
         """Switch the active player and rotate the board for that player's view."""
@@ -391,9 +405,14 @@ class Game:
             return
         while True:
             if self.timer:
-                self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), self.formatTime())
+                text = self.formatTime()
             else:
-                self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), "")
+                text = ""
+            if turnsBack % 2 == 0:
+                self.gui.refresh(self.formattedBoard(self.reversedBoard(self.moves[-turnsBack])), text)
+            else:
+                self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), text)
+
 
             if self.timer:
                 inp = self.gui.waitClick(monotonic())
