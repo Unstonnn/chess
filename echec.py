@@ -44,7 +44,7 @@ class Game:
             hasStockfish = True
         except:
             hasStockfish = False
-            print("Warning: Couldn't import ctypes")
+            input("Warning: Couldn't import Stockfish from stockfish")
         while True:
             if skip:
                 self.initiate()
