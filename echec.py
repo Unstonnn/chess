@@ -190,9 +190,9 @@ class Game:
         if self.timer:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
 
-    def playSound(self, name: str):
+    def playSound(self, name: str, previous = False):
         """Play a move sound, using the check sound when the opponent is in check."""
-        if name != "game-end" and self.isInCheck():
+        if name != "game-end" and self.isInCheck() and not previous:
             name = "move-check"
         self.sounds[name].play()
 
@@ -343,6 +343,7 @@ class Game:
         turnsBack = 2
         if turnsBack > allTurns:
             return
+        self.playSound("move-self")
         while True:
             if self.timer:
                 text = self.formatTime()
@@ -353,25 +354,26 @@ class Game:
             else:
                 self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), text)
 
-
             if self.timer:
                 inp = self.gui.waitClick(monotonic())
             else:
                 inp = self.gui.waitClick()
 
-            if inp == '_L':
-                turnsBack += 1
-            elif inp == '_R':
+            if inp == '_R':
                 turnsBack -= 1
+                self.playSound("move-self", True)
+                if turnsBack == 1:
+                    return
+            elif inp == '_L':
+                turnsBack += 1
+                if turnsBack > allTurns:
+                    turnsBack = allTurns
+                else:
+                    self.playSound("move-self", True)
             elif inp == "_T":
                 continue
             else:
                 return
-
-            if turnsBack == 1:
-                return
-            if turnsBack > allTurns:
-                turnsBack = allTurns
 
     def run(self):
         """Run turns, update the board, and enforce game-ending conditions."""
@@ -821,9 +823,8 @@ class Pawn:
             piece = Game.board[inp[1]-1][inp[0]]
             if piece == 0:
                 moves.append((inp[0], inp[1]-1))
-            piece = Game.board[inp[1]-2][inp[0]]
-            if inp[1] == 6 and piece == 0:
-                moves.append((inp[0], inp[1]-2))
+                if inp[1] == 6 and Game.board[inp[1]-2][inp[0]] == 0:
+                    moves.append((inp[0], inp[1]-2))
             if inp[0]+1 <= 7:
                 piece = Game.board[inp[1]-1][inp[0]+1]
                 if piece != 0:
