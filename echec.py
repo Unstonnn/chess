@@ -1,11 +1,17 @@
 from guiEchec import *
+import os
+import pygame
 from time import monotonic
 import random
+from pathlib import Path
+import sys
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # cspell:ignore Stockfish, Singleplayer
+
+# TODO: Add castling and en passant support for stockfish (l551)
 
 # ---------------------------------- Classes ---------------------------------- #
 
@@ -46,7 +52,9 @@ class Game:
             print("Warning: Couldn't import ctypes")
         try:
             from stockfish import Stockfish
-            self.stockfish = Stockfish(path="stockfish/stockfish-windows-x86-64-universal.exe")
+            bundle_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+            stockfish_path = bundle_dir / "stockfish" / "stockfish-windows-x86-64-universal.exe"
+            self.stockfish = Stockfish(path=str(stockfish_path))
             self.stockfish.set_skill_level(5)
             hasStockfish = True
         except:
@@ -228,6 +236,7 @@ class Game:
                 return choices[choice.upper()](self.white)
 
     def reversedBoard(self, board = None):
+        """Return a board flipped for the opposing player's view."""
         if board is None:
             board = self.board
         actBoard = [row.copy() for row in board]
@@ -266,6 +275,12 @@ class Game:
         self.p1 = P1
         self.p2 = P2
         self.gui = GUIechec()
+        soundNames = ("capture", "castle", "game-end", "move-check", "move-self", "promote")
+        audioPath = os.path.join(os.path.dirname(__file__), "audio")
+        self.sounds = {
+            name: pygame.mixer.Sound(os.path.join(audioPath, f"{name}.mp3"))
+            for name in soundNames
+        }
         self.board = [[Rook(False), Knight(False), Bishop(False), Queen(False), King(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)] for j in range(4)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), Queen(True), King(True), Bishop(True), Knight(True), Rook(True)]]
         # Keep a board snapshot so previous positions can be displayed and compared.
         self.moves = [[row.copy() for row in self.board]]
@@ -280,6 +295,12 @@ class Game:
         self.fullMoves = 1
         if self.timer and not self.playStockfish:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
+
+    def playSound(self, name: str, previous = False):
+        """Play a move sound, using the check sound when the opponent is in check."""
+        if name != "game-end" and self.isInCheck() and not previous:
+            name = "move-check"
+        self.sounds[name].play()
 
     def formattedBoard(self, actBoard = None):
         """Convert piece objects into the string codes expected by the GUI."""
@@ -347,6 +368,7 @@ class Game:
     def win(self, reason): # Ways to win: Checkmate ; resignation ; time
         """End the game and display the winner and the reason."""
         self.runs = False
+        self.playSound("game-end")
         color = "Black" if self.white else "White"
         if reason == 0:
             reason = "By checkmate"
@@ -358,6 +380,7 @@ class Game:
     def draw(self, reason): # Ways to draw: Insufficient material ; repetition ; 50 moves ; stalemate ; agreement
         """End the game and display a draw with the supplied reason."""
         self.runs = False
+        self.playSound("game-end")
         if reason == 0:
             reason = "By stalemate"
         elif reason == 1:
@@ -426,6 +449,7 @@ class Game:
         turnsBack = 2
         if turnsBack > allTurns:
             return
+        self.playSound("move-self")
         while True:
             if self.timer and not self.playStockfish:
                 text = self.formatTime()
@@ -442,10 +466,17 @@ class Game:
             else:
                 inp = self.gui.waitClick()
 
-            if inp == '_L':
-                turnsBack += 1
-            elif inp == '_R':
+            if inp == '_R':
                 turnsBack -= 1
+                self.playSound("move-self", True)
+                if turnsBack == 1:
+                    return
+            elif inp == '_L':
+                turnsBack += 1
+                if turnsBack > allTurns:
+                    turnsBack = allTurns
+                else:
+                    self.playSound("move-self", True)
             elif inp == "_T":
                 continue
             else:
@@ -457,6 +488,7 @@ class Game:
                 turnsBack = allTurns
 
     def formatFEN(self, enPassant='-'):
+        """Build the current board position as a FEN string."""
         pieceMap = {
         'BR': 'r', 'BN': 'n', 'BB': 'b', 'BQ': 'q', 'BK': 'k', 'BP': 'p',
         'WR': 'R', 'WN': 'N', 'WB': 'B', 'WQ': 'Q', 'WK': 'K', 'WP': 'P'
@@ -515,10 +547,7 @@ class Game:
                 
             rowsFEN.append(rowFEN)
             
-        # Join the rows with slashes
         layout = "/".join(rowsFEN)
-        
-        # FEN requires 6 parts separated by spaces
         return f"{layout} {turn} {castling} {enPassant} {self.halfMoves} {self.fullMoves}"
 
     def uciToGameFormat(self, uci):
@@ -530,7 +559,20 @@ class Game:
         if not self.white:
             startX, startY = 7 - startX, 7 - startY
             endX, endY = 7 - endX, 7 - endY
-        
+
+        start = (startX, startY)
+        destination = (endX, endY)
+        movingPiece = self.board[startY][startX]
+        specialMove = None
+        # A king moving two squares horizontally is a special move that also swaps the rook
+        if isinstance(movingPiece, King) and abs(endX - startX) == 2:
+            transit = ((startX + endX) // 2, endY)
+            rookX = 7 if endX > startX else 0
+            specialMove = (destination, transit, (rookX, startY))
+        # A pawn captures diagonally into an empty square, so the captured pawn is removed from the side square
+        elif isinstance(movingPiece, Pawn) and startX != endX and self.board[endY][endX] == 0 and isinstance(self.board[startY][endX], Pawn) and self.board[startY][endX].white != movingPiece.white:
+            specialMove = (destination, (endX, startY))
+
         promotion = uci[4] if len(uci) > 4 else None
         if promotion == 'q':
             promotion = Queen(self.white)
@@ -542,7 +584,7 @@ class Game:
         elif promotion == 'n':
             promotion = Knight(self.white)
         
-        return (startX, startY), (endX, endY), promotion
+        return start, destination, promotion, specialMove
 
     def getStockfishMove(self):
         """Pass the FEN to the wrapper and extract both best and ponder moves."""
@@ -562,6 +604,7 @@ class Game:
         return bestMove, ponder, eval
 
     def formatAnalysis(self, ponder, eval):
+        """Return Stockfish's evaluation text for the display."""
         return f"{eval['type']} {eval['value']} | {ponder}"
 
     def run(self):
@@ -582,9 +625,15 @@ class Game:
 
             if self.playStockfish:
                 if self.white != self.playingWhite:
-                    self.gui.refresh(self.reversedBoard(self.formattedBoard()), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    if self.showAnalysis:
+                        self.gui.refresh(self.reversedBoard(self.formattedBoard()), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    else:
+                        self.gui.refresh(self.reversedBoard(self.formattedBoard()), "", self.dotBoard)
                 else:
-                    self.gui.refresh(self.formattedBoard(), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    if self.showAnalysis:
+                        self.gui.refresh(self.formattedBoard(), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    else:
+                        self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
             elif self.timer:
                 self.gui.refresh(self.formattedBoard(), self.formatTime(), self.dotBoard)
             else:
@@ -639,8 +688,8 @@ class Game:
 
             if self.white != self.playingWhite and self.playStockfish:
                 bestMove, ponder, eval = self.getStockfishMove()
-                piece, inp, promotion = self.uciToGameFormat(bestMove)
-                moves = [inp]
+                piece, inp, promotion, specialMove = self.uciToGameFormat(bestMove)
+                moves = [specialMove if specialMove is not None else inp]
             else:
                 if self.timer and not self.playStockfish:
                     inp = self.gui.waitClick(monotonic())
@@ -679,6 +728,7 @@ class Game:
                             self.halfMoves = 0
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
+                            self.playSound("capture")
                             toSkip = True
                             self.fen = self.formatFEN()
                             # print(self.isInCheck())
@@ -693,14 +743,18 @@ class Game:
                             self.halfMoves += 1
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
+                            self.playSound("castle")
                             toSkip = True
                             self.fen = self.formatFEN()
                             # print(self.isInCheck())
                             break
                     if move == inp:
+                        captured = self.board[inp[1]][inp[0]] != 0
+                        promoted = False
                         self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                         self.board[piece[1]][piece[0]] = 0
                         if inp[1] == 0 and isinstance(self.board[inp[1]][inp[0]], Pawn):
+                            promoted = True
                             # Automatically promote to a queen unless manual choice is enabled.
                             if self.playingWhite != self.white and self.playStockfish:
                                 self.board[inp[1]][inp[0]] = promotion
@@ -721,6 +775,7 @@ class Game:
                         isDoublePawnMove = isinstance(self.board[inp[1]][inp[0]], Pawn) and piece[1] - inp[1] == 2
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
+                        self.playSound("promote" if promoted else "capture" if captured else "move-self")
                         toSkip = True
                         if isDoublePawnMove:
                             targetX = inp[0] if not self.white else 7 - inp[0]
@@ -1050,9 +1105,8 @@ class Pawn:
             piece = Game.board[inp[1]-1][inp[0]]
             if piece == 0:
                 moves.append((inp[0], inp[1]-1))
-            piece = Game.board[inp[1]-2][inp[0]]
-            if inp[1] == 6 and piece == 0:
-                moves.append((inp[0], inp[1]-2))
+                if inp[1] == 6 and Game.board[inp[1]-2][inp[0]] == 0:
+                    moves.append((inp[0], inp[1]-2))
             if inp[0]+1 <= 7:
                 piece = Game.board[inp[1]-1][inp[0]+1]
                 if piece != 0:
