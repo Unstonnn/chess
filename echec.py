@@ -1,4 +1,6 @@
 from guiEchec import *
+import os
+import pygame
 from time import monotonic
 
 # ---------------------------------- Classes ---------------------------------- #
@@ -173,6 +175,12 @@ class Game:
         self.p1 = P1
         self.p2 = P2
         self.gui = GUIechec()
+        soundNames = ("capture", "castle", "game-end", "move-check", "move-self", "promote")
+        audioPath = os.path.join(os.path.dirname(__file__), "audio")
+        self.sounds = {
+            name: pygame.mixer.Sound(os.path.join(audioPath, f"{name}.mp3"))
+            for name in soundNames
+        }
         self.board = [[Rook(False), Knight(False), Bishop(False), Queen(False), King(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)] for j in range(4)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), Queen(True), King(True), Bishop(True), Knight(True), Rook(True)]]
         # Keep a board snapshot so previous positions can be displayed and compared.
         self.moves = [[row.copy() for row in self.board]]
@@ -181,6 +189,12 @@ class Game:
         self.white = True
         if self.timer:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
+
+    def playSound(self, name: str):
+        """Play a move sound, using the check sound when the opponent is in check."""
+        if name != "game-end" and self.isInCheck():
+            name = "move-check"
+        self.sounds[name].play()
 
     def formattedBoard(self, actBoard = None):
         """Convert piece objects into the string codes expected by the GUI."""
@@ -248,6 +262,7 @@ class Game:
     def win(self, reason): # Ways to win: Checkmate ; resignation ; time
         """End the game and display the winner and the reason."""
         self.runs = False
+        self.playSound("game-end")
         color = "Black" if self.white else "White"
         if reason == 0:
             reason = "By checkmate"
@@ -259,6 +274,7 @@ class Game:
     def draw(self, reason): # Ways to draw: Insufficient material ; repetition ; 50 moves ; stalemate ; agreement
         """End the game and display a draw with the supplied reason."""
         self.runs = False
+        self.playSound("game-end")
         if reason == 0:
             reason = "By stalemate"
         elif reason == 1:
@@ -444,6 +460,7 @@ class Game:
                             moveRule = 0
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
+                            self.playSound("capture")
                             toSkip = True
                             # print(self.isInCheck())
                             break
@@ -457,13 +474,17 @@ class Game:
                             moveRule += 1
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
+                            self.playSound("castle")
                             toSkip = True
                             # print(self.isInCheck())
                             break
                     if move == inp:
+                        captured = self.board[inp[1]][inp[0]] != 0
+                        promoted = False
                         self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                         self.board[piece[1]][piece[0]] = 0
                         if inp[1] == 0 and isinstance(self.board[inp[1]][inp[0]], Pawn):
+                            promoted = True
                             # Automatically promote to a queen unless manual choice is enabled.
                             if self.autoPromote:
                                 self.board[inp[1]][inp[0]] = Queen(self.white)
@@ -479,6 +500,7 @@ class Game:
                             moveRule += 1
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
+                        self.playSound("promote" if promoted else "capture" if captured else "move-self")
                         toSkip = True
                         # print(self.isInCheck())
                         break

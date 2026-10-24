@@ -8,6 +8,7 @@ A two-player chess game built in Python with Pygame. Play on a graphical board, 
 - Optional game clock with configurable starting time and per-move increment.
 - Automatic queen promotion or manual promotion to a queen, rook, bishop, or knight.
 - In-game move history browsing.
+- Sound effects for moves, captures, castling, promotion, check, and game end.
 - Chess end conditions including checkmate, stalemate, repetition, the 50-move rule, and insufficient material.
 
 ## Requirements and platform support
@@ -15,7 +16,7 @@ A two-player chess game built in Python with Pygame. Play on a graphical board, 
 - Python 3.9 or newer
 - The packages listed in [requirements.txt](requirements.txt)
 
-The interactive menu is Windows-specific. The board-only game can also be used on macOS and Linux. The chess game in `echec.py` depends on `guiEchec.py` for its graphical interface. Keep `guiEchec.py`, the `Images` folder, and `led.ttf` alongside `echec.py`.
+The interactive menu is Windows-specific. The board-only game can also be used on macOS and Linux. The chess game in `echec.py` depends on `guiEchec.py` for its graphical interface. Keep `guiEchec.py`, the `Images` and `audio` folders, and `led.ttf` alongside `echec.py`.
 
 ## Install and run
 
@@ -84,13 +85,13 @@ The executable's game mode is determined by the `Game(...)` call in the `if __na
 For the menu version, make sure that block calls `Game()`, then run:
 
 ```powershell
-pyinstaller --clean --onefile --name "chess" --add-data "Images;Images" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
+pyinstaller --clean --onefile --name "chess" --add-data "Images;Images" --add-data "audio;audio" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
 ```
 
 For the board-only version, temporarily change the call to `Game(True)` and add `--noconsole`:
 
 ```powershell
-pyinstaller --clean --noconsole --onefile --name "chessNoMenu" --add-data "Images;Images" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
+pyinstaller --clean --noconsole --onefile --name "chessNoMenu" --add-data "Images;Images" --add-data "audio;audio" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
 ```
 
 ## Background and credits
