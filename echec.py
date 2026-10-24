@@ -617,9 +617,15 @@ class Game:
 
             if self.playStockfish:
                 if self.white != self.playingWhite:
-                    self.gui.refresh(self.reversedBoard(self.formattedBoard()), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    if self.showAnalysis:
+                        self.gui.refresh(self.reversedBoard(self.formattedBoard()), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    else:
+                        self.gui.refresh(self.reversedBoard(self.formattedBoard()), "", self.dotBoard)
                 else:
-                    self.gui.refresh(self.formattedBoard(), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    if self.showAnalysis:
+                        self.gui.refresh(self.formattedBoard(), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    else:
+                        self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
             elif self.timer:
                 self.gui.refresh(self.formattedBoard(), self.formatTime(), self.dotBoard)
             else:
