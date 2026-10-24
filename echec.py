@@ -234,6 +234,7 @@ class Game:
                 return choices[choice.upper()](self.white)
 
     def reversedBoard(self, board = None):
+        """Return a board flipped for the opposing player's view."""
         if board is None:
             board = self.board
         actBoard = [row.copy() for row in board]
@@ -463,6 +464,7 @@ class Game:
                 turnsBack = allTurns
 
     def formatFEN(self, enPassant='-'):
+        """Build the current board position as a FEN string."""
         pieceMap = {
         'BR': 'r', 'BN': 'n', 'BB': 'b', 'BQ': 'q', 'BK': 'k', 'BP': 'p',
         'WR': 'R', 'WN': 'N', 'WB': 'B', 'WQ': 'Q', 'WK': 'K', 'WP': 'P'
@@ -521,10 +523,7 @@ class Game:
                 
             rowsFEN.append(rowFEN)
             
-        # Join the rows with slashes
         layout = "/".join(rowsFEN)
-        
-        # FEN requires 6 parts separated by spaces
         return f"{layout} {turn} {castling} {enPassant} {self.halfMoves} {self.fullMoves}"
 
     def uciToGameFormat(self, uci):
@@ -536,7 +535,20 @@ class Game:
         if not self.white:
             startX, startY = 7 - startX, 7 - startY
             endX, endY = 7 - endX, 7 - endY
-        
+
+        start = (startX, startY)
+        destination = (endX, endY)
+        movingPiece = self.board[startY][startX]
+        specialMove = None
+        # A king moving two squares horizontally is a special move that also swaps the rook
+        if isinstance(movingPiece, King) and abs(endX - startX) == 2:
+            transit = ((startX + endX) // 2, endY)
+            rookX = 7 if endX > startX else 0
+            specialMove = (destination, transit, (rookX, startY))
+        # A pawn captures diagonally into an empty square, so the captured pawn is removed from the side square
+        elif isinstance(movingPiece, Pawn) and startX != endX and self.board[endY][endX] == 0 and isinstance(self.board[startY][endX], Pawn) and self.board[startY][endX].white != movingPiece.white:
+            specialMove = (destination, (endX, startY))
+
         promotion = uci[4] if len(uci) > 4 else None
         if promotion == 'q':
             promotion = Queen(self.white)
@@ -548,7 +560,7 @@ class Game:
         elif promotion == 'n':
             promotion = Knight(self.white)
         
-        return (startX, startY), (endX, endY), promotion
+        return start, destination, promotion, specialMove
 
     def getStockfishMove(self):
         """Pass the FEN to the wrapper and extract both best and ponder moves."""
@@ -568,6 +580,7 @@ class Game:
         return bestMove, ponder, eval
 
     def formatAnalysis(self, ponder, eval):
+        """Return Stockfish's evaluation text for the display."""
         return f"{eval['type']} {eval['value']} | {ponder}"
 
     def run(self):
@@ -645,8 +658,8 @@ class Game:
 
             if self.white != self.playingWhite and self.playStockfish:
                 bestMove, ponder, eval = self.getStockfishMove()
-                piece, inp, promotion = self.uciToGameFormat(bestMove)
-                moves = [inp]
+                piece, inp, promotion, specialMove = self.uciToGameFormat(bestMove)
+                moves = [specialMove if specialMove is not None else inp]
             else:
                 if self.timer and not self.playStockfish:
                     inp = self.gui.waitClick(monotonic())
