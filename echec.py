@@ -343,7 +343,7 @@ class Game:
         turnsBack = 2
         if turnsBack > allTurns:
             return
-        self.playSound("move-self")
+        self.playSound("move-self", True)
         while True:
             if self.timer:
                 text = self.formatTime()
