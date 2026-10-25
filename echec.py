@@ -207,19 +207,24 @@ class Game:
                             if answers["choice"] != "Back":
                                 skillLevel = answers["choice"]
                             if answers["choice"] == "Easy":
-                                self.stockfish.set_skill_level(1)
+                                self.stockfish.set_skill_level(0)
+                                self.stockfish.set_depth(1)
                             elif answers["choice"] == "Medium":
                                 self.stockfish.set_skill_level(5)
+                                self.stockfish.set_depth(5)
                             elif answers["choice"] == "Hard":
                                 self.stockfish.set_skill_level(13)
+                                self.stockfish.set_depth(13)
                             elif answers["choice"] == "Impossible":
                                 self.stockfish.resume_full_strength()
+                                self.stockfish.set_depth(15)
                             elif answers["choice"] == "Other":
-                                inp = input("\033[2J\033[HSkill Level (1-20): ")
+                                inp = input("\033[2J\033[HSkill Level (0-20): ")
                                 try:
                                     inp = int(inp)
-                                    if inp >= 1 and inp <= 20:
+                                    if inp >= 0 and inp <= 20:
                                         self.stockfish.set_skill_level(inp)
+                                        self.stockfish.set_depth(inp if inp < 15 else 15)
                                     else:
                                         input("Number out of range")
                                 except:
@@ -377,6 +382,8 @@ class Game:
         elif reason == 1:
             reason = "On time"
         self.gui.refresh(self.formattedBoard(), reason, self.dotBoard)
+        if self.playStockfish and self.white != self.playingWhite:
+            self.gui.refresh(self.reversedBoard(self.formattedBoard()), reason, self.dotBoard)
         self.gui.messCentre(f"{color} wins")
 
     def draw(self, reason): # Ways to draw: Insufficient material ; repetition ; 50 moves ; stalemate ; agreement
