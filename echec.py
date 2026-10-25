@@ -2,6 +2,16 @@ from guiEchec import *
 import os
 import pygame
 from time import monotonic
+import random
+from pathlib import Path
+import sys
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# cspell:ignore Stockfish, Singleplayer
+
+# TODO: Add castling and en passant support for stockfish (l551)
 
 # ---------------------------------- Classes ---------------------------------- #
 
@@ -19,7 +29,14 @@ class Game:
         self.timer = False
         self.baseTime = 15
         self.increment = 10
+        self.playStockfish = False
+        self.showAnalysis = False
         mainMenu = True
+        mainOptions = True
+        skillLevel = "Medium"
+        self.playingWhite = True
+        playedColor = "Random"
+        colorEnum = {"Random": "White", "White": "Black", "Black": "Random"}
         GRAY = '\033[90m'
         RED  = '\033[91m'
 
@@ -33,6 +50,16 @@ class Game:
         except:
             skip = True
             print("Warning: Couldn't import ctypes")
+        try:
+            from stockfish import Stockfish
+            bundle_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+            stockfish_path = bundle_dir / "stockfish" / "stockfish-windows-x86-64-universal.exe"
+            self.stockfish = Stockfish(path=str(stockfish_path))
+            self.stockfish.set_skill_level(5)
+            hasStockfish = True
+        except:
+            hasStockfish = False
+            input("Warning: Couldn't import stockfish")
         while True:
             if skip:
                 self.initiate()
@@ -79,57 +106,129 @@ class Game:
                                 ]
                     answers = inquirer.prompt(questions)
                     if answers["choice"] == "Start Game":
-                        startGame()
+                        if hasStockfish:
+                            questions = [
+                            inquirer.List("choice", message=f"\033[2J\033[H{RED}Select Game Mode",
+                                        choices=["Singleplayer", "Local Multiplayer", "Back"],
+                                        carousel=True)
+                                        ]
+                            answers = inquirer.prompt(questions)
+                            if answers["choice"] == "Singleplayer":
+                                if playedColor == "White":
+                                    self.playingWhite = True
+                                elif playedColor == "Black":
+                                    self.playingWhite = False
+                                else:
+                                    self.playingWhite = random.choice([True, False])
+                                self.playStockfish = True
+                                startGame()
+                            elif answers["choice"] == "Local Multiplayer":
+                                self.playStockfish = False
+                                startGame()
+                        else:
+                            startGame()
                     elif answers["choice"] == "Options":
                         mainMenu = False
                     elif answers["choice"] == "Quit":
                         break
                 else:
-                    if not self.timer:
-                        options = [f"Auto Promotion — {self.autoPromote}",
-                                f"Timer — {self.timer}",
-                                f"{GRAY}Starting Time — {self.baseTime}",
-                                f"{GRAY}Increment — {self.increment}",
-                                "Back"]
+                    if mainOptions:
+                        if not self.timer:
+                            options = [f"Auto Promotion — {self.autoPromote}",
+                                    f"Timer — {self.timer}",
+                                    f"{GRAY}Starting Time — {self.baseTime}",
+                                    f"{GRAY}Increment — {self.increment}"]
+                        else:
+                            options = [f"Auto Promotion — {self.autoPromote}",
+                                    f"Timer — {self.timer}",
+                                    f"Starting Time — {self.baseTime}",
+                                    f"Increment — {self.increment}"]
+                        if hasStockfish:
+                            options.append("Singleplayer Options")
+                        options.append("Back")
+                        questions = [
+                        inquirer.List("choice", message=f"\033[2J\033[H{RED}Options",
+                                    choices=options,
+                                    carousel=True)
+                                    ]
+                        answers = inquirer.prompt(questions)
+                        if answers["choice"] == "Back":
+                            mainMenu = True
+                        elif answers["choice"] == options[0]:
+                            self.autoPromote = not self.autoPromote
+                        elif answers["choice"] == options[1]:
+                            self.timer = not self.timer
+                        elif self.timer:
+                            if answers["choice"] == options[2]:
+                                inp = input("\033[2J\033[HStarting Time (in minutes): ")
+                                try:
+                                    inp = int(inp)
+                                    if inp > 0 and inp <= 720:
+                                        self.baseTime = inp
+                                    else:
+                                        input("Number out of range")
+                                except:
+                                    input("Please enter an integer")
+                            elif answers["choice"] == options[3]:
+                                inp = input("\033[2J\033[HIncrement (in seconds): ")
+                                try:
+                                    inp = int(inp)
+                                    if inp >= 0 and inp <= 240:
+                                        self.increment = inp
+                                    else:
+                                        input("Number out of range")
+                                except:
+                                    input("Please enter an integer")
+                        elif answers["choice"] == "Singleplayer Options":
+                            mainOptions = False
                     else:
-                        options = [f"Auto Promotion — {self.autoPromote}",
-                                f"Timer — {self.timer}",
-                                f"Starting Time — {self.baseTime}",
-                                f"Increment — {self.increment}",
-                                "Back"]
-                    questions = [
-                    inquirer.List("choice", message=f"\033[2J\033[H{RED}Options",
-                                choices=options,
-                                carousel=True)
-                                ]
-                    answers = inquirer.prompt(questions)
-                    if answers["choice"] == "Back":
-                        mainMenu = True
-                    elif answers["choice"] == options[0]:
-                        self.autoPromote = not self.autoPromote
-                    elif answers["choice"] == options[1]:
-                        self.timer = not self.timer
-                    elif self.timer:
-                        if answers["choice"] == options[2]:
-                            inp = input("\033[2J\033[HStarting Time (in minutes): ")
-                            try:
-                                inp = int(inp)
-                                if inp > 0 and inp <= 720:
-                                    self.baseTime = inp
-                                else:
-                                    input("Number out of range")
-                            except:
-                                input("Please enter an integer")
-                        elif answers["choice"] == options[3]:
-                            inp = input("\033[2J\033[HIncrement (in seconds): ")
-                            try:
-                                inp = int(inp)
-                                if inp >= 0 and inp <= 240:
-                                    self.increment = inp
-                                else:
-                                    input("Number out of range")
-                            except:
-                                input("Please enter an integer")
+                        bestMove = f"Analysis — {self.showAnalysis}"
+                        chosenColor = f"Color played — {playedColor}"
+                        questions = [
+                        inquirer.List("choice", message=f"\033[2J\033[H{RED}Singleplayer Options",
+                                    choices=["Difficulty", chosenColor, bestMove, "Back"],
+                                    carousel=True)
+                                    ]
+                        answers = inquirer.prompt(questions)
+                        if answers["choice"] == "Back":
+                            mainOptions = True
+                        elif answers["choice"] == bestMove:
+                            self.showAnalysis = not self.showAnalysis
+                        elif answers["choice"] == chosenColor:
+                            playedColor = colorEnum[playedColor]
+                        elif answers["choice"] == "Difficulty":
+                            questions = [
+                            inquirer.List("choice", message=f"\033[2J\033[H{RED}Difficulty",
+                                        choices=["Easy", "Medium", "Hard", "Impossible", "Other", "Back"],
+                                        default=skillLevel,
+                                        carousel=True)
+                                        ]
+                            answers = inquirer.prompt(questions)
+                            if answers["choice"] != "Back":
+                                skillLevel = answers["choice"]
+                            if answers["choice"] == "Easy":
+                                self.stockfish.set_skill_level(0)
+                                self.stockfish.set_depth(1)
+                            elif answers["choice"] == "Medium":
+                                self.stockfish.set_skill_level(5)
+                                self.stockfish.set_depth(5)
+                            elif answers["choice"] == "Hard":
+                                self.stockfish.set_skill_level(13)
+                                self.stockfish.set_depth(13)
+                            elif answers["choice"] == "Impossible":
+                                self.stockfish.resume_full_strength()
+                                self.stockfish.set_depth(15)
+                            elif answers["choice"] == "Other":
+                                inp = input("\033[2J\033[HSkill Level (0-20): ")
+                                try:
+                                    inp = int(inp)
+                                    if inp >= 0 and inp <= 20:
+                                        self.stockfish.set_skill_level(inp)
+                                        self.stockfish.set_depth(inp if inp < 15 else 15)
+                                    else:
+                                        input("Number out of range")
+                                except:
+                                    input("Please enter an integer")
 
     def manualPromotion(self):
         """Ask the player to choose a piece when a pawn is promoted."""
@@ -142,6 +241,7 @@ class Game:
                 return choices[choice.upper()](self.white)
 
     def reversedBoard(self, board = None):
+        """Return a board flipped for the opposing player's view."""
         if board is None:
             board = self.board
         actBoard = [row.copy() for row in board]
@@ -151,14 +251,19 @@ class Game:
 
     def reverse(self):
         """Switch the active player and rotate the board for that player's view."""
-        if self.timer:
+        if self.timer and not self.playStockfish:
             self.remainingTime[self.white] -= monotonic() - self.turnStarted
             self.remainingTime[self.white] += self.increment
             self.turnStarted = monotonic()
         self.white = not self.white
-        self.gui.flipNum = self.white
+        if self.playStockfish:
+            self.gui.flipNum = not self.playingWhite
+        else:
+            self.gui.flipNum = not self.white
         self.board = list(reversed(self.board))
         self.board = [list(reversed(row)) for row in self.board]
+        if self.white:
+            self.fullMoves += 1
 
     def clearDots(self,  moves: list = []):
         """Clear highlighted squares, then mark the supplied legal moves."""
@@ -175,6 +280,8 @@ class Game:
         self.p1 = P1
         self.p2 = P2
         self.gui = GUIechec()
+        pygame.scrap.init()
+        pygame.scrap.set_mode(pygame.SCRAP_CLIPBOARD)
         soundNames = ("capture", "castle", "game-end", "move-check", "move-self", "promote")
         audioPath = os.path.join(os.path.dirname(__file__), "audio")
         self.sounds = {
@@ -185,9 +292,15 @@ class Game:
         # Keep a board snapshot so previous positions can be displayed and compared.
         self.moves = [[row.copy() for row in self.board]]
         self.dotBoard = [[0 for i in range(8)] for j in range(8)]
-        self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
+        self.gui.flipNum = not self.playingWhite
+        if self.playStockfish and not self.playingWhite:
+            self.gui.refresh(self.reversedBoard(self.formattedBoard()), "", self.dotBoard)
+        else:
+            self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
         self.white = True
-        if self.timer:
+        self.halfMoves = 0 # 50-move rule counter
+        self.fullMoves = 1
+        if self.timer and not self.playStockfish:
             self.remainingTime = {True: self.baseTime * 60, False: self.baseTime * 60}
 
     def playSound(self, name: str, previous = False):
@@ -269,6 +382,8 @@ class Game:
         elif reason == 1:
             reason = "On time"
         self.gui.refresh(self.formattedBoard(), reason, self.dotBoard)
+        if self.playStockfish and self.white != self.playingWhite:
+            self.gui.refresh(self.reversedBoard(self.formattedBoard()), reason, self.dotBoard)
         self.gui.messCentre(f"{color} wins")
 
     def draw(self, reason): # Ways to draw: Insufficient material ; repetition ; 50 moves ; stalemate ; agreement
@@ -345,7 +460,7 @@ class Game:
             return
         self.playSound("move-self", True)
         while True:
-            if self.timer:
+            if self.timer and not self.playStockfish:
                 text = self.formatTime()
             else:
                 text = ""
@@ -354,7 +469,8 @@ class Game:
             else:
                 self.gui.refresh(self.formattedBoard(self.moves[-turnsBack]), text)
 
-            if self.timer:
+
+            if self.timer and not self.playStockfish:
                 inp = self.gui.waitClick(monotonic())
             else:
                 inp = self.gui.waitClick()
@@ -375,18 +491,159 @@ class Game:
             else:
                 return
 
+            if turnsBack == 1:
+                return
+            if turnsBack > allTurns:
+                turnsBack = allTurns
+
+    def formatFEN(self, enPassant='-'):
+        """Build the current board position as a FEN string."""
+        pieceMap = {
+        'BR': 'r', 'BN': 'n', 'BB': 'b', 'BQ': 'q', 'BK': 'k', 'BP': 'p',
+        'WR': 'R', 'WN': 'N', 'WB': 'B', 'WQ': 'Q', 'WK': 'K', 'WP': 'P'
+        }
+        if self.white:
+            turn = 'w'
+        else:
+            turn = "b"
+
+        castling = ''
+        if self.white:
+            if isinstance(self.board[7][4], King) and not self.board[7][4].moved:
+                if isinstance(self.board[7][7], Rook) and not self.board[7][7].moved:
+                    castling += 'K'
+                if isinstance(self.board[7][0], Rook) and not self.board[7][0].moved:
+                    castling += 'Q'
+            if isinstance(self.board[0][4], King) and not self.board[0][4].moved:
+                if isinstance(self.board[0][7], Rook) and not self.board[0][7].moved:
+                    castling += 'k'
+                if isinstance(self.board[0][0], Rook) and not self.board[0][0].moved:
+                    castling += 'q'
+        else:
+            if isinstance(self.board[0][3], King) and not self.board[0][3].moved:
+                if isinstance(self.board[0][0], Rook) and not self.board[0][0].moved:
+                    castling += 'K'
+                if isinstance(self.board[0][7], Rook) and not self.board[0][7].moved:
+                    castling += 'Q'
+            if isinstance(self.board[7][3], King) and not self.board[7][3].moved:
+                if isinstance(self.board[7][0], Rook) and not self.board[7][0].moved:
+                    castling += 'k'
+                if isinstance(self.board[7][7], Rook) and not self.board[7][7].moved:
+                    castling += 'q'
+        if castling == '':
+            castling = '-'
+        
+        board = self.formattedBoard()
+        if not self.white:
+            board = self.reversedBoard(board)
+        rowsFEN = []
+
+        for row in board:
+            emptyCount = 0
+            rowFEN = ""
+            
+            for square in row:
+                if square == 0:
+                    emptyCount += 1
+                else:
+                    if emptyCount > 0:
+                        rowFEN += str(emptyCount)
+                        emptyCount = 0
+                    rowFEN += pieceMap[square]
+                    
+            if emptyCount > 0:
+                rowFEN += str(emptyCount)
+                
+            rowsFEN.append(rowFEN)
+            
+        layout = "/".join(rowsFEN)
+        return f"{layout} {turn} {castling} {enPassant} {self.halfMoves} {self.fullMoves}"
+
+    def uciToGameFormat(self, uci):
+        """Convert a UCI string to the program's coordinate system."""
+        startX = ord(uci[0]) - ord('a')
+        endX = ord(uci[2]) - ord('a')
+        startY = 8 - int(uci[1])
+        endY = 8 - int(uci[3])
+        if not self.white:
+            startX, startY = 7 - startX, 7 - startY
+            endX, endY = 7 - endX, 7 - endY
+
+        start = (startX, startY)
+        destination = (endX, endY)
+        movingPiece = self.board[startY][startX]
+        specialMove = None
+        # A king moving two squares horizontally is a special move that also swaps the rook
+        if isinstance(movingPiece, King) and abs(endX - startX) == 2:
+            transit = ((startX + endX) // 2, endY)
+            rookX = 7 if endX > startX else 0
+            specialMove = (destination, transit, (rookX, startY))
+        # A pawn captures diagonally into an empty square, so the captured pawn is removed from the side square
+        elif isinstance(movingPiece, Pawn) and startX != endX and self.board[endY][endX] == 0 and isinstance(self.board[startY][endX], Pawn) and self.board[startY][endX].white != movingPiece.white:
+            specialMove = (destination, (endX, startY))
+
+        promotion = uci[4] if len(uci) > 4 else None
+        if promotion == 'q':
+            promotion = Queen(self.white)
+        elif promotion == 'r':
+            promotion = Rook(self.white)
+            promotion.moved = True
+        elif promotion == 'b':
+            promotion = Bishop(self.white)
+        elif promotion == 'n':
+            promotion = Knight(self.white)
+        
+        return start, destination, promotion, specialMove
+
+    def getStockfishMove(self):
+        """Pass the FEN to the wrapper and extract both best and ponder moves."""
+        self.stockfish.set_fen_position(self.fen)
+        bestMove = self.stockfish.get_best_move()
+        raw = self.stockfish.raw_stockfish_output(self.stockfish.get_best_move)
+        ponder = None
+        eval = self.stockfish.get_evaluation()
+
+        for line in raw:
+            if line.startswith("bestmove"):
+                parts = line.split()
+                # Line format: bestmove e2e4 ponder g8f6
+                if len(parts) >= 4 and parts[2] == "ponder":
+                    ponder = parts[3]
+                break
+        return bestMove, ponder, eval
+
+    def formatAnalysis(self, ponder, eval):
+        """Return Stockfish's evaluation text for the display."""
+        return f"{eval['type']} {eval['value']} | {ponder}"
+
     def run(self):
         """Run turns, update the board, and enforce game-ending conditions."""
         self.runs = True
         moves = []
-        moveRule = 0 # 50-move rule counter        
-        if self.timer:
+        self.fen = self.formatFEN()
+        try:
+            bestMove, ponder, eval = self.getStockfishMove()
+            ponder = bestMove
+        except:
+            pass
+        if self.timer and not self.playStockfish:
             self.turnStarted = monotonic()
 
         while self.runs:
             toSkip = False
 
-            if self.timer:
+            if self.playStockfish:
+                if self.white != self.playingWhite:
+                    if self.showAnalysis:
+                        self.gui.refresh(self.reversedBoard(self.formattedBoard()), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    else:
+                        self.gui.refresh(self.reversedBoard(self.formattedBoard()), "", self.dotBoard)
+                else:
+                    if self.showAnalysis:
+                        self.gui.refresh(self.formattedBoard(), self.formatAnalysis(ponder, eval), self.dotBoard)
+                    else:
+                        self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
+            elif self.timer:
                 self.gui.refresh(self.formattedBoard(), self.formatTime(), self.dotBoard)
             else:
                 self.gui.refresh(self.formattedBoard(), "", self.dotBoard)
@@ -424,9 +681,9 @@ class Game:
                     repetition += 1
             if repetition == 3:
                 self.draw(2) # Repetition
-            if moveRule >= 100:
+            if self.halfMoves >= 100:
                 self.draw(4) # 50-move rule
-            if self.timer and self.remainingTime[self.white] - self.elapsedTime <= 0:
+            if self.timer and not self.playStockfish and self.remainingTime[self.white] - self.elapsedTime <= 0:
                 if len(otherIF) <= 2 and otherPieces == otherIF:
                     self.draw(1) # On time by insufficient material
                 else:
@@ -438,10 +695,16 @@ class Game:
                     if inp is None or inp == '_S':
                         return
 
-            if self.timer:
-                inp = self.gui.waitClick(monotonic())
+            if self.white != self.playingWhite and self.playStockfish:
+                bestMove, ponder, eval = self.getStockfishMove()
+                piece, inp, promotion, specialMove = self.uciToGameFormat(bestMove)
+                moves = [specialMove if specialMove is not None else inp]
             else:
-                inp = self.gui.waitClick()
+                if self.timer and not self.playStockfish:
+                    inp = self.gui.waitClick(monotonic())
+                else:
+                    inp = self.gui.waitClick()
+            # print(inp)
 
             if inp == '_L':
                 self.previousMoves()
@@ -452,6 +715,21 @@ class Game:
             if inp == '_S':
                 return
 
+            if isinstance(inp, str) and inp.upper() == 'A':
+                try:
+                    print(self.formatAnalysis(ponder, eval))
+                    pygame.scrap.put(pygame.SCRAP_TEXT, self.formatAnalysis(ponder, eval).encode("utf-8"))
+                except:
+                    try: # Warning: Stockfish's best move here is the bot level's best move
+                        print(self.getStockfishMove())
+                        pygame.scrap.put(pygame.SCRAP_TEXT, self.getStockfishMove().encode("utf-8"))
+                    except:
+                        pass
+
+            if isinstance(inp, str) and inp.upper() == 'F':
+                print(self.fen)
+                pygame.scrap.put(pygame.SCRAP_TEXT, self.fen.encode("utf-8"))
+
             if moves != []:
                 for move in moves:
                     if isinstance(move[0],tuple): # en passant logic
@@ -459,11 +737,12 @@ class Game:
                             self.board[inp[1]][inp[0]] = self.board[piece[1]][piece[0]]
                             self.board[piece[1]][piece[0]] = 0
                             self.board[move[1][1]][move[1][0]] = 0
-                            moveRule = 0
+                            self.halfMoves = 0
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             self.playSound("capture")
                             toSkip = True
+                            self.fen = self.formatFEN()
                             # print(self.isInCheck())
                             break
                         elif move[0] == inp and isinstance(self.board[piece[1]][piece[0]], King): # castling logic
@@ -473,11 +752,12 @@ class Game:
                             self.board[move[2][1]][move[2][0]] = 0
                             self.board[inp[1]][inp[0]].moved = True
                             self.board[move[1][1]][move[1][0]].moved = True
-                            moveRule += 1
+                            self.halfMoves += 1
                             self.reverse()
                             self.moves.append([row.copy() for row in self.board])
                             self.playSound("castle")
                             toSkip = True
+                            self.fen = self.formatFEN()
                             # print(self.isInCheck())
                             break
                     if move == inp:
@@ -488,22 +768,36 @@ class Game:
                         if inp[1] == 0 and isinstance(self.board[inp[1]][inp[0]], Pawn):
                             promoted = True
                             # Automatically promote to a queen unless manual choice is enabled.
-                            if self.autoPromote:
+                            if self.playingWhite != self.white and self.playStockfish:
+                                self.board[inp[1]][inp[0]] = promotion
+                            elif self.autoPromote:
                                 self.board[inp[1]][inp[0]] = Queen(self.white)
                             else:
                                 self.board[inp[1]][inp[0]] = self.manualPromotion()
+                                if isinstance(self.board[inp[1]][inp[0]], Rook):
+                                    self.board[inp[1]][inp[0]].moved = True
                         elif isinstance(self.board[inp[1]][inp[0]], King):
                             self.board[inp[1]][inp[0]].moved = True
                         elif isinstance(self.board[inp[1]][inp[0]], Rook):
                             self.board[inp[1]][inp[0]].moved = True
                         if self.moves[-1][inp[1]][inp[0]] != 0 or isinstance(self.board[inp[1]][inp[0]], Pawn):
-                            moveRule = 0
+                            self.halfMoves = 0
                         else:
-                            moveRule += 1
+                            self.halfMoves += 1
+                        isDoublePawnMove = isinstance(self.board[inp[1]][inp[0]], Pawn) and piece[1] - inp[1] == 2
                         self.reverse()
                         self.moves.append([row.copy() for row in self.board])
                         self.playSound("promote" if promoted else "capture" if captured else "move-self")
                         toSkip = True
+                        if isDoublePawnMove:
+                            targetX = inp[0] if not self.white else 7 - inp[0]
+                            targetY = (piece[1] + inp[1]) // 2
+                            if self.white:
+                                targetY = 7 - targetY
+                            enPassant = f"{'abcdefgh'[targetX]}{8 - targetY}"
+                            self.fen = self.formatFEN(enPassant)
+                        else:
+                            self.fen = self.formatFEN()
                         # print(self.isInCheck())
                         break
 

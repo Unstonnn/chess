@@ -1,11 +1,13 @@
 # Chess
 
-A two-player chess game built in Python with Pygame. Play on a graphical board, choose your promotion and clock settings, and review previous positions during a game.
+A chess game built in Python with Pygame. Play locally or against Stockfish, choose your promotion and clock settings, and review previous positions during a game.
 
 ## Features
 
 - Local two-player chess with a graphical board.
-- Optional game clock with configurable starting time and per-move increment.
+- Single-player chess against Stockfish, with selectable side and engine difficulty.
+- Stockfish evaluation and suggested-move information during single-player games.
+- Optional clock for local multiplayer, with configurable starting time and per-move increment.
 - Automatic queen promotion or manual promotion to a queen, rook, bishop, or knight.
 - In-game move history browsing.
 - Sound effects for moves, captures, castling, promotion, check, and game end.
@@ -15,8 +17,9 @@ A two-player chess game built in Python with Pygame. Play on a graphical board, 
 
 - Python 3.9 or newer
 - The packages listed in [requirements.txt](requirements.txt)
+- The included Windows Stockfish executable at `stockfish/stockfish-windows-x86-64-universal.exe` for single-player games.
 
-The interactive menu is Windows-specific. The board-only game can also be used on macOS and Linux. The chess game in `echec.py` depends on `guiEchec.py` for its graphical interface. Keep `guiEchec.py`, the `Images` and `audio` folders, and `led.ttf` alongside `echec.py`.
+The included Stockfish executable is Windows-specific, so Stockfish single-player is available on Windows. The interactive menu is Windows-specific. The board-only game can also be used on macOS and Linux. The chess game in `echec.py` depends on `guiEchec.py` for its graphical interface. Keep `guiEchec.py`, the `Images` and `audio` folders, and `led.ttf` alongside `echec.py`.
 
 ## Install and run
 
@@ -52,13 +55,15 @@ Pass `True` to skip the menu and start directly at the board on any operating sy
 game = Game(True)
 ```
 
-From the Windows menu, you can start a game, change options, or quit. The options include automatic or manual promotion and an optional clock with configurable starting time and increment.
+From the Windows menu, choose single-player against Stockfish or local multiplayer. General options include automatic or manual promotion and an optional clock for local multiplayer. Single-player options let you set the engine difficulty (Easy, Medium, Hard, Impossible, or a custom skill level from 1 to 20) and choose your side or randomize it.
 
 ## Controls
 
 - **Mouse:** Select a piece and then its destination.
+- **A:** Print the Stockfish evaluation and suggested move during a single-player game.
+- **F:** Print the current position in FEN notation.
 - **Q**, **R**, **B**, or **N:** Choose a promotion piece when automatic promotion is disabled.
-- **Left / Right arrow:** Browse previous positions after pressing **Left** during a game.
+- **Left arrow:** Open move history during a game; then use **Left / Right** to browse positions. Press another key to return to the current game.
 - **Close the game window:** Return to the menu.
 - **Escape:** Exit the application.
 
@@ -77,21 +82,21 @@ The release executables can be built on Windows with PyInstaller. From the proje
 ```powershell
 py -3.13 -m venv venv
 .\venv\Scripts\activate
-pip install pyinstaller pygame-ce inquirer==3.4.1 blessed readchar
+pip install -r requirements.txt pyinstaller blessed readchar
 ```
 
-The executable's game mode is determined by the `Game(...)` call in the `if __name__ == "__main__":` block of `echec.py` when you build it.
+The executable's game mode is determined by the `Game(...)` call in the `if __name__ == "__main__":` block of `echec.py` when you build it. Include the Stockfish engine executable in the build so single-player mode is available:
 
 For the menu version, make sure that block calls `Game()`, then run:
 
 ```powershell
-pyinstaller --clean --onefile --name "chess" --add-data "Images;Images" --add-data "audio;audio" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
+pyinstaller --clean --onefile --name "chess" --add-data "Images;Images" --add-data "audio;audio" --add-data "led.ttf;." --add-data "stockfish/stockfish-windows-x86-64-universal.exe;stockfish" --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
 ```
 
 For the board-only version, temporarily change the call to `Game(True)` and add `--noconsole`:
 
 ```powershell
-pyinstaller --clean --noconsole --onefile --name "chessNoMenu" --add-data "Images;Images" --add-data "audio;audio" --add-data "led.ttf;." --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
+pyinstaller --clean --noconsole --onefile --name "chessNoMenu" --add-data "Images;Images" --add-data "audio;audio" --add-data "led.ttf;." --add-data "stockfish/stockfish-windows-x86-64-universal.exe;stockfish" --hidden-import inquirer --hidden-import ctypes --hidden-import blessed --hidden-import readchar --copy-metadata readchar --copy-metadata inquirer echec.py
 ```
 
 ## Background and credits
@@ -100,4 +105,4 @@ I created the chess game in `echec.py` for a computer science class. The graphic
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+This project is licensed under the MIT License. See [LICENSE](LICENSE). The included Stockfish engine is licensed under the GPLv3 License. See [Copying.txt](stockfish/Copying.txt).
