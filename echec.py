@@ -275,6 +275,8 @@ class Game:
         self.p1 = P1
         self.p2 = P2
         self.gui = GUIechec()
+        pygame.scrap.init()
+        pygame.scrap.set_mode(pygame.SCRAP_CLIPBOARD)
         soundNames = ("capture", "castle", "game-end", "move-check", "move-self", "promote")
         audioPath = os.path.join(os.path.dirname(__file__), "audio")
         self.sounds = {
@@ -709,14 +711,17 @@ class Game:
             if isinstance(inp, str) and inp.upper() == 'A':
                 try:
                     print(self.formatAnalysis(ponder, eval))
+                    pygame.scrap.put(pygame.SCRAP_TEXT, self.formatAnalysis(ponder, eval).encode("utf-8"))
                 except:
                     try: # Warning: Stockfish's best move here is the bot level's best move
                         print(self.getStockfishMove())
+                        pygame.scrap.put(pygame.SCRAP_TEXT, self.getStockfishMove().encode("utf-8"))
                     except:
                         pass
 
             if isinstance(inp, str) and inp.upper() == 'F':
                 print(self.fen)
+                pygame.scrap.put(pygame.SCRAP_TEXT, self.fen.encode("utf-8"))
 
             if moves != []:
                 for move in moves:
