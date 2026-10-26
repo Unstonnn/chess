@@ -1,10 +1,12 @@
 from guiEchec import *
 import os
 import pygame
+import subprocess
 from time import monotonic
 import random
 from pathlib import Path
 import sys
+from unittest.mock import patch
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -50,12 +52,23 @@ class Game:
         except:
             skip = True
             print("Warning: Couldn't import ctypes")
-        try:
+        try: # This try built with the help of AI
             from stockfish import Stockfish
             bundle_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
             stockfish_path = bundle_dir / "stockfish" / "stockfish-windows-x86-64-universal.exe"
-            self.stockfish = Stockfish(path=str(stockfish_path))
+            if sys.platform == "win32":
+                original_popen = subprocess.Popen
+
+                def popen_without_console(*args, **kwargs):
+                    kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+                    return original_popen(*args, **kwargs)
+
+                with patch("stockfish.models.subprocess.Popen", new=popen_without_console):
+                    self.stockfish = Stockfish(path=str(stockfish_path))
+            else:
+                self.stockfish = Stockfish(path=str(stockfish_path))
             self.stockfish.set_skill_level(5)
+            self.stockfish.set_depth(5)
             hasStockfish = True
         except:
             hasStockfish = False
@@ -716,13 +729,13 @@ class Game:
                 return
 
             if isinstance(inp, str) and inp.upper() == 'A':
-                try:
+                if self.playStockfish:
                     print(self.formatAnalysis(ponder, eval))
                     pygame.scrap.put(pygame.SCRAP_TEXT, self.formatAnalysis(ponder, eval).encode("utf-8"))
-                except:
+                else:
                     try: # Warning: Stockfish's best move here is the bot level's best move
                         print(self.getStockfishMove())
-                        pygame.scrap.put(pygame.SCRAP_TEXT, self.getStockfishMove().encode("utf-8"))
+                        pygame.scrap.put(pygame.SCRAP_TEXT, str(self.getStockfishMove()).encode("utf-8"))
                     except:
                         pass
 
@@ -1143,7 +1156,7 @@ class Pawn:
 # -------------------------------- Main program ------------------------------- #
 
 if __name__ == "__main__":
-    game = Game()
+    game = Game(True)
 
 # Boards for tests:
 # game = Game([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
