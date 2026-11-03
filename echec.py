@@ -79,6 +79,12 @@ class Game:
                 if board is not None:
                     self.customBoard(board)
                 self.run()
+                try:
+                    self.stockfish.resume_full_strength()
+                    self.stockfish.set_depth(15)
+                except:
+                    pass
+
             else:
                 # startGame() built with the help of AI
                 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -1156,7 +1162,7 @@ class Pawn:
 # -------------------------------- Main program ------------------------------- #
 
 if __name__ == "__main__":
-    game = Game(True)
+    game = Game()
 
 # Boards for tests:
 # game = Game([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
