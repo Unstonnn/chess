@@ -1167,3 +1167,16 @@ if __name__ == "__main__":
 # Boards for tests:
 # game = Game([[Rook(False), Knight(False), Bishop(False), King(False), Queen(False), Bishop(False), Knight(False), Rook(False)]] + [[Pawn(False) for i in range(8)]] + [[0 for i in range(8)]] + [[0,0,0,0,0,0,0,0]] + [[0 for i in range(8)] for j in range(2)] + [[Pawn(True) for i in range(8)]] + [[Rook(True), Knight(True), Bishop(True), King(True), Queen(True), Bishop(True), Knight(True), Rook(True)]])
 # game = Game([[0, 0, 0, King(False), 0, 0, 0, 0]] + [[0 for i in range(8)] for j in range(6)] + [[0, 0, 0, King(True), Queen(True), 0, 0, 0]])
+
+
+# Formatted board:
+# board = [
+#     [Rook(False), Knight(False), Bishop(False), Queen(False), King(False), Bishop(False), Knight(False), Rook(False)],
+#     [Pawn(False), Pawn(False),   Pawn(False),   Pawn(False),  Pawn(False), Pawn(False),   Pawn(False),   Pawn(False)],
+#     [0,           0,             0,             0,            0,           0,             0,             0,         ],
+#     [0,           0,             0,             0,            0,           0,             0,             0,         ],
+#     [0,           0,             0,             0,            0,           0,             0,             0,         ],
+#     [0,           0,             0,             0,            0,           0,             0,             0,         ],
+#     [Pawn(True),  Pawn(True),    Pawn(True),    Pawn(True),   Pawn(True),  Pawn(True),    Pawn(True),    Pawn(True) ], 
+#     [Rook(True),  Knight(True),  Bishop(True),  Queen(True),  King(True),  Bishop(True),  Knight(True),  Rook(True) ]
+# ]
